@@ -1,7 +1,7 @@
 /*
- * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
- * Copyright (c) 2014, SBPrime <https://github.com/SBPrime/>
- * Copyright (c) AsyncWorldEdit contributors
+ * AsyncWorldEdit API
+ * Copyright (c) 2015, SBPrime <https://github.com/SBPrime/>
+ * Copyright (c) AsyncWorldEdit API contributors
  *
  * All rights reserved.
  *
@@ -38,13 +38,43 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.primesoft.asyncworldedit.api.map;
 
-package org.primesoft.asyncworldedit.utils;
+import com.sk89q.worldedit.BlockVector2D;
+import java.io.File;
+import org.primesoft.asyncworldedit.api.IWorld;
 
 /**
  *
  * @author SBPrime
  */
-public interface Action {
-    void execute();
+public interface IMapUtils {
+    /**
+     * Get teh map folder
+     * @param w
+     * @return 
+     */
+    public File getMapFolder(IWorld w);
+    
+    
+    /**
+     * Get the map region folder
+     * @param w
+     * @return 
+     */
+    public File getMapRegion(IWorld w);
+        
+    /**
+     * Get the map region files
+     * @param w
+     * @return 
+     */
+    public File[] getMapFiles(IWorld w);
+    
+    /**
+     * Get the available chunks
+     * @param w
+     * @return 
+     */
+    public BlockVector2D[] getAllWorldChunks(IWorld w);
 }

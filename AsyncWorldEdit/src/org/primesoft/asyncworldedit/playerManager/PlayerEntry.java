@@ -42,9 +42,13 @@ package org.primesoft.asyncworldedit.playerManager;
 
 import java.util.UUID;
 import org.bukkit.entity.Player;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import org.primesoft.asyncworldedit.AsyncWorldEditBukkit;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
+import org.primesoft.asyncworldedit.api.MessageSystem;
+import org.primesoft.asyncworldedit.api.configuration.IPermissionGroup;
+import org.primesoft.asyncworldedit.api.permissions.IPermission;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 import org.primesoft.asyncworldedit.configuration.PermissionGroup;
-import org.primesoft.asyncworldedit.permissions.Permission;
 import org.primesoft.asyncworldedit.permissions.PermissionManager;
 import org.primesoft.asyncworldedit.strings.MessageType;
 
@@ -52,31 +56,26 @@ import org.primesoft.asyncworldedit.strings.MessageType;
  *
  * @author SBPrime
  */
-public class PlayerEntry {
-
-    public final static UUID UUID_CONSOLE = UUID.randomUUID();
-    public final static UUID UUID_UNKNOWN = UUID.randomUUID();
-
-    public final static PlayerEntry CONSOLE = new PlayerEntry(null, "<Console>", UUID_CONSOLE, PermissionGroup.getDefaultGroup(), true);
-    public final static PlayerEntry UNKNOWN = new PlayerEntry(null, "<Unknown>", UUID_UNKNOWN, PermissionGroup.getDefaultGroup(), false);
+public class PlayerEntry implements IPlayerEntry {
 
     private Player m_player;
     private String m_name;
     private final UUID m_uuid;
     private boolean m_mode;
-    private PermissionGroup m_group;
+    private IPermissionGroup m_group;
     private final boolean m_canTalk;
+    private boolean m_isDisposed;
 
-    public PlayerEntry(Player player, String name, PermissionGroup group) {
+    public PlayerEntry(Player player) {
+        this(player, player.getName(), PermissionGroup.getDefaultGroup());
+    }
+    
+    PlayerEntry(Player player, String name, IPermissionGroup group) {
         this(player, name, player.getUniqueId(), group, true);
     }
 
-    public PlayerEntry(String name, UUID uuid) {
-        this(null, name, uuid, PermissionGroup.getDefaultGroup(), false);
-    }
-    
-    private PlayerEntry(Player player, String name, UUID uuid,
-            PermissionGroup group, boolean canTalk) {
+    protected PlayerEntry(Player player, String name, UUID uuid,
+            IPermissionGroup group, boolean canTalk) {
         m_canTalk = canTalk;
         m_group = group;
         m_player = player;
@@ -85,6 +84,7 @@ public class PlayerEntry {
         m_mode = group.isOnByDefault();
     }
 
+    @Override
     public void say(String msg) {
         if (msg == null) {
             return;
@@ -97,7 +97,7 @@ public class PlayerEntry {
         }
 
         if (m_canTalk) {
-            AsyncWorldEditMain.sayConsole(msg);
+            AsyncWorldEditBukkit.sayConsole(msg);
         }
     }
 
@@ -105,31 +105,36 @@ public class PlayerEntry {
         return m_player;
     }
 
+    @Override
     public UUID getUUID() {
         return m_uuid;
     }
 
+    @Override
     public String getName() {
         return m_name;
     }
 
-    public boolean getMode() {
+    @Override
+    public boolean getAweMode() {
         return m_mode;
     }
 
-    public void setMode(boolean mode) {
+    @Override
+    public void setAweMode(boolean mode) {
         if (mode == m_mode) {
             return;
         }
 
         m_mode = mode;
 
-        say(MessageType.CMD_TOGGLE_MODE_CHANGED.format(mode ? 
-                MessageType.CMD_TOGGLE_MODE_ON.format() : MessageType.CMD_TOGGLE_MODE_OFF.format()));
+        say(MessageType.CMD_TOGGLE_MODE_CHANGED.format(mode
+                ? MessageType.CMD_TOGGLE_MODE_ON.format() : MessageType.CMD_TOGGLE_MODE_OFF.format()));
 
     }
 
-    public boolean isAllowed(Permission permission) {
+    @Override
+    public boolean isAllowed(IPermission permission) {
         return PermissionManager.isAllowed(m_player, permission);
     }
 
@@ -138,20 +143,24 @@ public class PlayerEntry {
      *
      * @return
      */
+    @Override
     public boolean isConsole() {
-        return UUID_CONSOLE.equals(m_uuid);
+        return PlayerManager.UUID_CONSOLE.equals(m_uuid);
     }
 
+    @Override
     public boolean isUnknown() {
-        return UUID_UNKNOWN.equals(m_uuid);
+        return PlayerManager.UUID_UNKNOWN.equals(m_uuid);
     }
 
+    @Override
     public boolean isPlayer() {
         return m_player != null
-                && !UUID_CONSOLE.equals(m_uuid)
-                && !UUID_UNKNOWN.equals(m_uuid);
+                && !PlayerManager.UUID_CONSOLE.equals(m_uuid)
+                && !PlayerManager.UUID_UNKNOWN.equals(m_uuid);
     }
 
+    @Override
     public boolean isInGame() {
         return isPlayer() && m_player.isOnline();
     }
@@ -177,18 +186,113 @@ public class PlayerEntry {
         return true;
     }
 
-    public PermissionGroup getPermissionGroup() {
+    @Override
+    public IPermissionGroup getPermissionGroup() {
         return m_group;
     }
 
+        /**
+     * Set the permission group
+     * @param permissionGroup 
+     */
+    protected void setPermissionGroup(IPermissionGroup permissionGroup) {
+        m_group = permissionGroup;
+    }
+
+    
     /**
      * Update the player after relogin
      *
      * @param player
-     * @param permissionGroup
      */
-    public void update(Player player, PermissionGroup permissionGroup) {
-        m_player = player;
-        m_group = permissionGroup;
+    @Override
+    public void update(IPlayerEntry player) {
+        if (!(player instanceof PlayerEntry)) {
+            return;
+        }
+
+        setPermissionGroup(player.getPermissionGroup());
+        m_player = ((PlayerEntry) player).getPlayer();
+    }
+
+    @Override
+    public void updatePermissionGroup() {
+        setPermissionGroup(PermissionManager.getPermissionGroup(m_player));
+    }
+
+    @Override
+    public void dispose() {
+        m_isDisposed = true;
+    }
+
+    @Override
+    public boolean isUndoOff() {
+        return false;
+    }
+
+    @Override
+    public Object getWaitMutex() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public boolean isDisposed() {
+        return m_isDisposed;
+    }
+
+    @Override
+    public void setUndoMode(boolean mode) {
+        log("******************************************************************************");
+        log("******************************************************************************");
+        log("**                                                                          **");
+        log("** Undo disable is not available for this version of the plugin             **");
+        log("**                                                                          **");
+        log("******************************************************************************");
+        log("******************************************************************************");
+    }
+
+    @Override
+    public void setMessaging(MessageSystem system, boolean state) {
+        log("******************************************************************************");
+        log("******************************************************************************");
+        log("**                                                                          **");
+        log("** Messagin system changes are not available for this version of the plugin **");
+        log("**                                                                          **");
+        log("******************************************************************************");
+        log("******************************************************************************");
+    }
+
+    @Override
+    public boolean getMessaging(MessageSystem system) {
+        return true;
+    }
+
+    @Override
+    public int getRenderBlocks() {
+        log("******************************************************************************");
+        log("******************************************************************************");
+        log("**                                                                          **");
+        log("** Render block per player are not available for this version of the plugin **");
+        log("**                                                                          **");
+        log("******************************************************************************");
+        log("******************************************************************************");
+
+        return 0;
+    }
+
+    @Override
+    public void setRenderBlocks(Integer b) {
+        log("******************************************************************************");
+        log("******************************************************************************");
+        log("**                                                                          **");
+        log("** Render block per player are not available for this version of the plugin **");
+        log("**                                                                          **");
+        log("******************************************************************************");
+        log("******************************************************************************");
+    }
+
+    @Override
+    public boolean isFake() {
+        return false;
     }
 }

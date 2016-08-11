@@ -1,7 +1,7 @@
 /*
- * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
+ * AsyncWorldEdit API
  * Copyright (c) 2015, SBPrime <https://github.com/SBPrime/>
- * Copyright (c) AsyncWorldEdit contributors
+ * Copyright (c) AsyncWorldEdit API contributors
  *
  * All rights reserved.
  *
@@ -41,14 +41,12 @@
 package org.primesoft.asyncworldedit.api.blockPlacer;
 
 import com.sk89q.worldedit.MaxChangedBlocksException;
-import org.primesoft.asyncworldedit.api.IPhysicsWatch;
-import org.primesoft.asyncworldedit.blockPlacer.BlockPlacerEntry;
-import org.primesoft.asyncworldedit.blockPlacer.BlockPlacerPlayer;
-import org.primesoft.asyncworldedit.blockPlacer.entries.JobEntry;
-import org.primesoft.asyncworldedit.playerManager.PlayerEntry;
-import org.primesoft.asyncworldedit.utils.FuncParamEx;
-import org.primesoft.asyncworldedit.worldedit.CancelabeEditSession;
-import org.primesoft.asyncworldedit.worldedit.ThreadSafeEditSession;
+import org.primesoft.asyncworldedit.api.blockPlacer.entries.IJobEntry;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
+import org.primesoft.asyncworldedit.api.utils.IAsyncCommand;
+import org.primesoft.asyncworldedit.api.utils.IFuncParamEx;
+import org.primesoft.asyncworldedit.api.worldedit.ICancelabeEditSession;
+import org.primesoft.asyncworldedit.api.worldedit.IThreadSafeEditSession;
 
 /**
  *
@@ -63,7 +61,7 @@ public interface IBlockPlacer {
      * @param job the job
      * @return
      */
-    boolean addJob(PlayerEntry player, JobEntry job);
+    boolean addJob(IPlayerEntry player, IJobEntry job);
 
     /**
      * Add event listener
@@ -79,7 +77,7 @@ public interface IBlockPlacer {
      * @param entry
      * @return
      */
-    boolean addTasks(PlayerEntry player, BlockPlacerEntry entry);
+    boolean addTasks(IPlayerEntry player, IBlockPlacerEntry entry);
 
     /**
      * Cancel job
@@ -88,14 +86,14 @@ public interface IBlockPlacer {
      * @param jobId
      * @return
      */
-    int cancelJob(PlayerEntry player, int jobId);
+    int cancelJob(IPlayerEntry player, int jobId);
 
     /**
      * Get all players in log
      *
      * @return players list
      */
-    PlayerEntry[] getAllPlayers();
+    IPlayerEntry[] getAllPlayers();
 
     /**
      * Get the player job
@@ -104,7 +102,7 @@ public interface IBlockPlacer {
      * @param jobId job ID
      * @return
      */
-    JobEntry getJob(PlayerEntry player, int jobId);
+    IJobEntry getJob(IPlayerEntry player, int jobId);
 
     /**
      * Get next job id for player
@@ -112,7 +110,7 @@ public interface IBlockPlacer {
      * @param player
      * @return
      */
-    int getJobId(PlayerEntry player);
+    int getJobId(IPlayerEntry player);
 
     /**
      * Gets the number of events for a player
@@ -120,7 +118,7 @@ public interface IBlockPlacer {
      * @param player player login
      * @return number of stored events
      */
-    BlockPlacerPlayer getPlayerEvents(PlayerEntry player);
+    IBlockPlacerPlayer getPlayerEvents(IPlayerEntry player);
 
     /**
      * Is the blocks placer paused
@@ -136,7 +134,17 @@ public interface IBlockPlacer {
      * @param jobName
      * @param action
      */
-    void performAsAsyncJob(final ThreadSafeEditSession editSession, final PlayerEntry player, final String jobName, final FuncParamEx<Integer, CancelabeEditSession, MaxChangedBlocksException> action);
+    void performAsAsyncJob(final IThreadSafeEditSession editSession, final IPlayerEntry player, final String jobName, 
+            final IFuncParamEx<Integer, ICancelabeEditSession, MaxChangedBlocksException> action);
+    
+    /**
+     * Perform an async command asynchronicly
+     *
+     * @param editSession
+     * @param asyncCommand
+     */
+    void performAsAsyncJob(final IThreadSafeEditSession editSession, final IAsyncCommand asyncCommand);
+    
 
     /**
      * Remove all entries for player
@@ -144,7 +152,7 @@ public interface IBlockPlacer {
      * @param player
      * @return
      */
-    int purge(PlayerEntry player);
+    int purge(IPlayerEntry player);
 
     /**
      * Remove all entries
@@ -159,7 +167,7 @@ public interface IBlockPlacer {
      * @param player
      * @param jobEntry
      */
-    void removeJob(final PlayerEntry player, JobEntry jobEntry);
+    void removeJob(final IPlayerEntry player, IJobEntry jobEntry);
 
     /**
      * Remove event listener

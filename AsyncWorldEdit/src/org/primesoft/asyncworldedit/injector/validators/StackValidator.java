@@ -42,7 +42,7 @@ package org.primesoft.asyncworldedit.injector.validators;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
 import org.primesoft.asyncworldedit.configuration.ConfigProvider;
 import org.primesoft.asyncworldedit.utils.InOutParam;
 
@@ -62,7 +62,15 @@ public class StackValidator {
         new StackValidatorEntry(".*sk89q.*SchematicCommands", "", ".*"),
         new StackValidatorEntry(".*sk89q.*RegionCommands", new String[]{"forest", "flora"}, ""),
         new StackValidatorEntry(".*sk89q.*BiomeCommands", new String[]{"setBiome"}, ""),
+        new StackValidatorEntry(".*sk89q.*SelectionCommand", new String[]{"call"}, "") {
+            @Override
+            public String getOperationName(String name) {
+                return "setBlocks";
+            }
+        },
+        new StackValidatorEntry(".*primesoft.*excommands.RegionCommands", new String[]{"replaceBlocks"}, ""),
         new StackValidatorEntry(".*primesoft.*ThreadSafeEditSession", "", ".*"),
+        new StackValidatorEntry(".*primesoft.*AsyncEditSessionFactory.*", "", ".*"),
         new StackValidatorEntry(".*primesoft.*AsyncEditSession.*", ".*", new String[]{
             "undo", "redo", "task", "flushQueue"
         })
@@ -85,9 +93,9 @@ public class StackValidator {
         final boolean debugOn = ConfigProvider.isDebugOn();
         try {
             if (debugOn) {
-                AsyncWorldEditMain.log("****************************************************************");
-                AsyncWorldEditMain.log("* Validating stack trace");
-                AsyncWorldEditMain.log("****************************************************************");
+                log("****************************************************************");
+                log("* Validating stack trace");
+                log("****************************************************************");
             }
 
             if (!validateStack(methodName)) {
@@ -100,14 +108,14 @@ public class StackValidator {
             return true;
         } finally {
             if (debugOn) {
-                AsyncWorldEditMain.log("****************************************************************");
+                log("****************************************************************");
 
             }
         }
     }
 
     /**
-     * Validate the stack trace possition
+     * Validate the stack trace position
      *
      * @param methodName
      * @return
@@ -120,7 +128,7 @@ public class StackValidator {
             for (; i >= 0; i--) {
                 StackTraceElement element = stackTrace[i];
                 if (debugOn) {
-                    AsyncWorldEditMain.log("* " + element.toString());
+                    log(String.format("* %1$s", element.toString()));
                 }
 
                 for (StackValidatorEntry entry : s_data) {
@@ -135,12 +143,12 @@ public class StackValidator {
                         m = pattern.matcher(name);
                         if (m.matches()) {
                             if (debugOn) {
-                                AsyncWorldEditMain.log("*");
-                                AsyncWorldEditMain.log("* Found on blacklist");
-                                AsyncWorldEditMain.log("* Class:\t\t" + element.getClassName());
-                                AsyncWorldEditMain.log("* Method:\t\t" + name);
-                                AsyncWorldEditMain.log("* Class pattern:\t" + entry.getClassPattern().pattern());
-                                AsyncWorldEditMain.log("* Method pattern:\t" + pattern.pattern());
+                                log("*");
+                                log("* Found on blacklist");
+                                log(String.format("* Class:\t\t%1$s", element.getClassName()));
+                                log(String.format("* Method:\t\t%1$s", name));
+                                log(String.format("* Class pattern:\t%1$s", entry.getClassPattern().pattern()));
+                                log(String.format("* Method pattern:\t%1$s", pattern.pattern()));
                             }
                             return false;
                         }
@@ -149,14 +157,14 @@ public class StackValidator {
                     for (Pattern pattern : entry.getMethodWhiteList()) {
                         m = pattern.matcher(name);
                         if (m.matches()) {
-                            methodName.setValue(name);
+                            methodName.setValue(entry.getOperationName(name));
                             if (debugOn) {
-                                AsyncWorldEditMain.log("*");
-                                AsyncWorldEditMain.log("* Found on whitelist");
-                                AsyncWorldEditMain.log("* Class:\t\t" + element.getClassName());
-                                AsyncWorldEditMain.log("* Method:\t\t" + name);
-                                AsyncWorldEditMain.log("* Class pattern:\t" + entry.getClassPattern().pattern());
-                                AsyncWorldEditMain.log("* Method pattern:\t" + pattern.pattern());
+                                log("*");
+                                log("* Found on whitelist");
+                                log(String.format("* Class:\t\t%1$s", element.getClassName()));
+                                log(String.format("* Method:\t\t%1$s", name));
+                                log(String.format("* Class pattern:\t%1$s", entry.getClassPattern().pattern()));
+                                log(String.format("* Method pattern:\t%1$s", pattern.pattern()));
                             }
                             return true;
                         }
@@ -165,19 +173,19 @@ public class StackValidator {
             }
 
             if (debugOn) {
-                AsyncWorldEditMain.log("*");
-                AsyncWorldEditMain.log("* No match found");
+                log("*");
+                log("* No match found");
             }
             return false;
         } finally {
             if (debugOn) {
-                AsyncWorldEditMain.log("*");
+                log("*");
                 i--;
                 for (; i >= 0; i--) {
                     StackTraceElement element = stackTrace[i];
-                    AsyncWorldEditMain.log("* " + element.toString());
+                    log(String.format("* %1$s", element.toString()));
                 }
-                AsyncWorldEditMain.log("*");
+                log("*");
             }
         }
     }
@@ -203,7 +211,7 @@ public class StackValidator {
 
             result &= cnt < 2;
             if (debugOn) {
-                AsyncWorldEditMain.log("* " + p.pattern() + " --> " + cnt);
+                log(String.format("* %1$s --> %2$s", p.pattern(), cnt));
             } else if (!result) {
                 return false;
             }

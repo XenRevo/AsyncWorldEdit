@@ -40,20 +40,22 @@
  */
 package org.primesoft.asyncworldedit.permissions;
 
+import org.primesoft.asyncworldedit.api.permissions.IPermission;
+
 /**
  * List of all permissions
  */
-public enum Permission {
+public enum Permission implements IPermission {
 
     /**
      * Allows the use of the Reload command
      */
-    RELOAD_CONFIG("admin.version"),
+    RELOAD_CONFIG("admin.reload"),
 
     /**
      * Informs the user on login if the plugin is updated or not
      */
-    ANNOUNCE_VERSION("admin.reload"),
+    ANNOUNCE_VERSION("admin.version"),
 
     /**
      * Bypass the maximum queue limit
@@ -124,6 +126,7 @@ public enum Permission {
      *
      * @return Entire permission node including base
      */
+    @Override
     public String getNode() {        
         return PermissionManager.AWE_PREFIX + permission;
     }

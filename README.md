@@ -1,5 +1,8 @@
 AsyncWorldEdit
 ==============
+The plugin was split into free and premium version. 
+Want more features? Want more frequent updates? Go to: [AsyncWorldEdit - Premium](https://github.com/SBPrime/AsyncWorldEdit-Premium)
+
 
 Async WorldEdit - Edit millions of blocks without lag!
 

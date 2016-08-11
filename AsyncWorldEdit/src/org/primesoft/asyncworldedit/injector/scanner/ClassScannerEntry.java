@@ -42,7 +42,7 @@ package org.primesoft.asyncworldedit.injector.scanner;
 
 import java.lang.reflect.Field;
 import java.util.regex.Pattern;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
 
 /**
  *
@@ -57,7 +57,7 @@ public class ClassScannerEntry {
         try {
             return Class.forName(name);
         } catch (ClassNotFoundException ex) {
-            AsyncWorldEditMain.log("Warning: Unable to get class " + name);
+            log(String.format("Warning: Unable to get class %1$s", name));
             return null;
         }
     }

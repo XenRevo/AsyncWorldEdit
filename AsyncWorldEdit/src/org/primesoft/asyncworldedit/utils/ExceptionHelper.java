@@ -40,7 +40,7 @@
  */
 package org.primesoft.asyncworldedit.utils;
 
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import org.primesoft.asyncworldedit.AsyncWorldEditBukkit;
 
 /**
  *
@@ -49,7 +49,7 @@ import org.primesoft.asyncworldedit.AsyncWorldEditMain;
 public class ExceptionHelper {
 
     private static void log(String m) {
-        AsyncWorldEditMain.log(m);
+        AsyncWorldEditBukkit.log(m);
     }
 
     public static void printException(Throwable ex, String message) {
@@ -60,8 +60,8 @@ public class ExceptionHelper {
         log("***********************************");
         log(message);
         log("***********************************");
-        log("* Exception: " + ex.getClass().getCanonicalName());
-        log("* Error message: " + ex.getLocalizedMessage());
+        log(String.format("* Exception: %1$s", ex.getClass().getName()));
+        log(String.format("* Error message: %1$s", ex.getLocalizedMessage()));
         log("* Stack: ");
         printStack(ex, "* ");
         log("***********************************");

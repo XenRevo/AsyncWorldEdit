@@ -40,13 +40,15 @@
  */
 package org.primesoft.asyncworldedit.blockPlacer;
 
-import org.primesoft.asyncworldedit.blockPlacer.entries.JobEntry;
 import java.util.ArrayDeque;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import org.primesoft.asyncworldedit.playerManager.PlayerEntry;
+import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacerEntry;
+import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacerPlayer;
+import org.primesoft.asyncworldedit.api.blockPlacer.entries.IJobEntry;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 import org.primesoft.asyncworldedit.strings.MessageType;
 
 /**
@@ -54,7 +56,7 @@ import org.primesoft.asyncworldedit.strings.MessageType;
  *
  * @author SBPrime
  */
-public class BlockPlacerPlayer {
+public class BlockPlacerPlayer implements IBlockPlacerPlayer {
     /**
      * Number of samples used in AVG count
      */
@@ -62,7 +64,7 @@ public class BlockPlacerPlayer {
     /**
      * The queue
      */
-    private Queue<BlockPlacerEntry> m_queue;
+    private Queue<IBlockPlacerEntry> m_queue;
     /**
      * Current block placing speed (blocks per second)
      */
@@ -71,7 +73,7 @@ public class BlockPlacerPlayer {
     /**
      * List of jobs
      */
-    private final HashMap<Integer, JobEntry> m_jobs;
+    private final HashMap<Integer, IJobEntry> m_jobs;
 
     /**
      * Is the player informed about queue limit reached
@@ -87,18 +89,18 @@ public class BlockPlacerPlayer {
     /**
      * The player
      */
-    private final PlayerEntry m_player;
+    private final IPlayerEntry m_player;
     
 
     /**
      * Create new player entry
      * @param player
      */
-    public BlockPlacerPlayer(PlayerEntry player) {
+    public BlockPlacerPlayer(IPlayerEntry player) {
         m_player = player;
-        m_queue = new ArrayDeque();
+        m_queue = new LinkedList();
         m_speed = 0;
-        m_jobs = new HashMap<Integer, JobEntry>();
+        m_jobs = new HashMap<Integer, IJobEntry>();
     }
 
     /**
@@ -106,6 +108,7 @@ public class BlockPlacerPlayer {
      *
      * @return
      */
+    @Override
     public int getMaxQueueBlocks() {
         return m_maxBlocksOnQueue;
     }
@@ -114,6 +117,7 @@ public class BlockPlacerPlayer {
      * Set the maximum number of blocks on queue
      * @param val
      */
+    @Override
     public void setMaxQueueBlocks(int val) {
         m_maxBlocksOnQueue = val;
     }
@@ -123,7 +127,8 @@ public class BlockPlacerPlayer {
      *
      * @return
      */
-    public Queue<BlockPlacerEntry> getQueue() {
+    @Override
+    public Queue<IBlockPlacerEntry> getQueue() {
         return m_queue;
     }
 
@@ -132,7 +137,8 @@ public class BlockPlacerPlayer {
      *
      * @param newQueue
      */
-    public void updateQueue(Queue<BlockPlacerEntry> newQueue) {
+    @Override
+    public void updateQueue(Queue<IBlockPlacerEntry> newQueue) {
         m_queue = newQueue;
     }
 
@@ -141,6 +147,7 @@ public class BlockPlacerPlayer {
      *
      * @return
      */
+    @Override
     public double getSpeed() {
         return m_speed;
     }
@@ -151,6 +158,7 @@ public class BlockPlacerPlayer {
      * @param blocks number of blocks
      * @param timeDelta time spend
      */
+    @Override
     public void updateSpeed(double blocks, long timeDelta) {
         double delta = timeDelta / 1000.0;
         m_speed = (m_speed * (AVG_SAMPLES - 1) + (blocks / delta)) / AVG_SAMPLES;
@@ -161,6 +169,7 @@ public class BlockPlacerPlayer {
      *
      * @return
      */
+    @Override
     public int getNextJobId() {
         int maxId = -1;
         synchronized (m_jobs) {
@@ -180,7 +189,8 @@ public class BlockPlacerPlayer {
      * @param force
      * @return 
      */
-    public boolean addJob(JobEntry job, boolean force) {
+    @Override
+    public boolean addJob(IJobEntry job, boolean force) {
         boolean add;
         int maxJobs = m_player.getPermissionGroup().getMaxJobs();
         synchronized (m_jobs) {
@@ -209,7 +219,8 @@ public class BlockPlacerPlayer {
      *
      * @param job
      */
-    public void removeJob(JobEntry job) {
+    @Override
+    public void removeJob(IJobEntry job) {
         if (job == null)
         {
             return;
@@ -229,6 +240,7 @@ public class BlockPlacerPlayer {
      *
      * @param jobId
      */
+    @Override
     public void removeJob(int jobId) {
         synchronized (m_jobs) {
             if (!m_jobs.containsKey(jobId)) {
@@ -244,9 +256,10 @@ public class BlockPlacerPlayer {
      *
      * @return
      */
-    public Collection<JobEntry> getJobs() {
+    @Override
+    public IJobEntry[] getJobs() {
         synchronized (m_jobs) {
-            return m_jobs.values();
+            return m_jobs.values().toArray(new IJobEntry[0]);
         }
     }
 
@@ -255,13 +268,14 @@ public class BlockPlacerPlayer {
      *
      * @param lines
      */
+    @Override
     public void printJobs(List<String> lines) {
         synchronized (m_jobs) {
             if (m_jobs.isEmpty()) {
                 return;
             }
             lines.add(MessageType.CMD_JOBS_HEADER.format());
-            for (JobEntry job : m_jobs.values()) {
+            for (IJobEntry job : m_jobs.values()) {
                 lines.add(MessageType.CMD_JOBS_LINE.format(job.toString(), job.getStatusString()));
             }
         }
@@ -272,6 +286,7 @@ public class BlockPlacerPlayer {
      *
      * @return
      */
+    @Override
     public boolean hasJobs() {
         synchronized (m_jobs) {
             return !m_jobs.isEmpty();
@@ -284,7 +299,8 @@ public class BlockPlacerPlayer {
      * @param jobId job ID
      * @return
      */
-    public JobEntry getJob(int jobId) {
+    @Override
+    public IJobEntry getJob(int jobId) {
         synchronized (m_jobs) {
             return m_jobs.get(jobId);
         }
@@ -295,6 +311,7 @@ public class BlockPlacerPlayer {
      *
      * @return
      */
+    @Override
     public boolean isInformed() {
         return m_isInformed;
     }
@@ -304,6 +321,7 @@ public class BlockPlacerPlayer {
      *
      * @param state
      */
+    @Override
     public void setInformed(boolean state) {
         m_isInformed = state;
     }

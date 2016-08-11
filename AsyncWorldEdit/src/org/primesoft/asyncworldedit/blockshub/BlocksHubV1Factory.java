@@ -1,6 +1,6 @@
 /*
  * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
- * Copyright (c) 2014, SBPrime <https://github.com/SBPrime/>
+ * Copyright (c) 2016, SBPrime <https://github.com/SBPrime/>
  * Copyright (c) AsyncWorldEdit contributors
  *
  * All rights reserved.
@@ -38,54 +38,50 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.primesoft.asyncworldedit.blockPlacer.entries;
+package org.primesoft.asyncworldedit.blockshub;
 
-import com.sk89q.worldedit.Vector;
-import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacer;
-import org.primesoft.asyncworldedit.blockPlacer.BlockPlacer;
-import org.primesoft.asyncworldedit.utils.ExceptionHelper;
-import org.primesoft.asyncworldedit.utils.FuncEx;
-import org.primesoft.asyncworldedit.worldedit.world.AsyncWorld;
+import org.PrimeSoft.blocksHub.BlocksHub;
+import org.PrimeSoft.blocksHub.IBlocksHubApi;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
 
 /**
  *
  * @author SBPrime
- * @param <T> Func result type
- * @param <TException> Exception type
  */
-public class WorldExtentFuncEntryEx<T, TException extends Exception>
-        extends WorldExtentBlockEntry {
-
-    private final FuncEx<T, TException> m_function;
-
-    public WorldExtentFuncEntryEx(AsyncWorld worldExtent,
-            int jobId, Vector location, FuncEx<T, TException> function) {
-        super(worldExtent, jobId, location);
-
-        m_function = function;
-    }
+class BlocksHubV1Factory implements IBlocksHubFactory {
+    private static final String NAME = "BlocksHub v1.x";
 
     @Override
-    public boolean process(IBlockPlacer bp) {
-        T funcResult;
+    public String getName() {
+        return NAME;
+    }
+    
 
-        try {
-            funcResult = m_function.execute();
-        } catch (Exception ex) {
-            ExceptionHelper.printException(ex, "Error while processing extent function.");
-            return false;
+    @Override
+    public IBlocksHubIntegration create(Object blocksHub) {
+        if (blocksHub == null) {
+            return null;
         }
-        finally
-        {
-            if (m_worldName != null) {
-                ((BlockPlacer)bp).getPhysicsWatcher().removeLocation(m_worldName, m_location);
-            }
+        
+        if (!(blocksHub instanceof BlocksHub)) {
+            log(String.format("%1$s: ...wrong plugin type", NAME));
+            return null;
         }
-
-        if (funcResult instanceof Boolean) {
-            return (Boolean) funcResult;
-        } else {
-            return true;
+        
+        BlocksHub bh = (BlocksHub)blocksHub;
+        
+        IBlocksHubApi api = bh.getApi();
+        if (api == null) {
+            log(String.format("%1$s: ...API not available", NAME));
+            return null;
         }
+        
+        double apiVersion = api.getVersion();
+        if (apiVersion < 1 || apiVersion >= 2) {
+            log(String.format("%1$s: ...unsupported API v%2$s, supported 1.x", NAME, apiVersion));
+            return null;
+        }
+        
+        return new BlocksHubIntegrationV1(api);
     }
 }

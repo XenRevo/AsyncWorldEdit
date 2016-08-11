@@ -40,10 +40,14 @@
  */
 package org.primesoft.asyncworldedit.injector.scanner;
 
+import com.sk89q.util.yaml.YAMLNode;
+import com.sk89q.wepif.PermissionsResolver;
 import com.sk89q.worldedit.BlockVector;
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.Vector;
 import com.sk89q.worldedit.blocks.BaseBlock;
+import com.sk89q.worldedit.entity.Entity;
+import com.sk89q.worldedit.entity.Player;
 import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import com.sk89q.worldedit.extent.world.FastModeExtent;
 import com.sk89q.worldedit.function.operation.BlockMapEntryPlacer;
@@ -56,15 +60,22 @@ import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.registry.BlockRegistry;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.UUID;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
-import org.primesoft.asyncworldedit.playerManager.PlayerEntry;
+import java.util.logging.Logger;
+import org.bukkit.Server;
+import org.bukkit.plugin.java.JavaPlugin;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
+import org.primesoft.asyncworldedit.api.classScanner.IClassFilter;
+import org.primesoft.asyncworldedit.api.classScanner.IClassScannerOptions;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 import org.primesoft.asyncworldedit.configuration.ConfigProvider;
 import org.primesoft.asyncworldedit.configuration.PermissionGroup;
 import org.primesoft.asyncworldedit.utils.ExceptionHelper;
@@ -75,28 +86,44 @@ import org.primesoft.asyncworldedit.worldedit.blocks.BaseBlockWrapper;
  *
  * @author SBPrime
  */
-public class ClassScanner {
+public class ClassScanner implements IClassScannerOptions {
 
-    private final static ClassScannerEntry[] s_blackList = new ClassScannerEntry[]{
+    /**
+     * List of all filters
+     */
+    private final List<IClassFilter> m_filters = new LinkedList<IClassFilter>();
+
+    private final ClassScannerEntry[] s_blackList = new ClassScannerEntry[]{
         new ClassScannerEntry("com.sk89q.worldedit.extent.reorder.MultiStageReorder$Stage3Committer"),
-        new ClassScannerEntry(BlockMapEntryPlacer.class, "iterator"),
-        new ClassScannerEntry(ChangeSet.class),
-        new ClassScannerEntry(EditSession.class),
-        new ClassScannerEntry(Region.class),
-        new ClassScannerEntry(BlockVector.class),
-        new ClassScannerEntry(World.class),
-        new ClassScannerEntry(FastModeExtent.class),
-        new ClassScannerEntry(Change.class),
-        new ClassScannerEntry(Vector.class),
-        new ClassScannerEntry(BaseBlock.class),
-        new ClassScannerEntry(BaseBlockWrapper.class),
-        new ClassScannerEntry(PermissionGroup.class),
-        new ClassScannerEntry(PlayerEntry.class),
-        new ClassScannerEntry(Clipboard.class),
-        new ClassScannerEntry(BlockRegistry.class),
-        new ClassScannerEntry(RandomPattern.class),
-        new ClassScannerEntry(ClipboardPattern.class),
-        new ClassScannerEntry(BlockPattern.class)
+            new ClassScannerEntry(BlockMapEntryPlacer.class, "iterator"),
+            new ClassScannerEntry(ChangeSet.class),
+            new ClassScannerEntry(EditSession.class),
+            new ClassScannerEntry(Region.class),
+            new ClassScannerEntry(BlockVector.class),
+            new ClassScannerEntry(World.class),
+            new ClassScannerEntry(FastModeExtent.class),
+            new ClassScannerEntry(Change.class),
+            new ClassScannerEntry(Vector.class),
+            new ClassScannerEntry(BaseBlock.class),
+            new ClassScannerEntry(BaseBlockWrapper.class),
+            new ClassScannerEntry(PermissionGroup.class),
+            new ClassScannerEntry(IPlayerEntry.class),
+            new ClassScannerEntry(Clipboard.class),
+            new ClassScannerEntry(BlockRegistry.class),
+            new ClassScannerEntry(RandomPattern.class),
+            new ClassScannerEntry(ClipboardPattern.class),
+            new ClassScannerEntry(BlockPattern.class),
+            new ClassScannerEntry(YAMLNode.class),
+            new ClassScannerEntry(Field.class),
+            new ClassScannerEntry(Method.class),
+            new ClassScannerEntry(PermissionsResolver.class),
+            new ClassScannerEntry(Logger.class),
+            new ClassScannerEntry(Player.class),
+            new ClassScannerEntry(ChangeSet.class),
+            new ClassScannerEntry(Entity.class),
+            
+            new ClassScannerEntry(Server.class),
+            new ClassScannerEntry(JavaPlugin.class)
     };
 
     /**
@@ -106,7 +133,7 @@ public class ClassScanner {
      * @param o Object to find
      * @return
      */
-    public static List<ClassScannerResult> scan(Class<?> types[], Object o) {
+    public List<ClassScannerResult> scan(Class<?> types[], Object o) {
         List<ClassScannerResult> result = new ArrayList<ClassScannerResult>();
         if (o == null) {
             return result;
@@ -119,9 +146,9 @@ public class ClassScanner {
         toScan.add(new ScannerQueueEntry(o, null, null));
 
         if (debugOn) {
-            AsyncWorldEditMain.log("****************************************************************");
-            AsyncWorldEditMain.log("* Scanning classes");
-            AsyncWorldEditMain.log("****************************************************************");
+            log("****************************************************************");
+            log("* Scanning classes");
+            log("****************************************************************");
         }
 
         /**
@@ -138,19 +165,19 @@ public class ClassScanner {
 
             String sParent;
             if (debugOn) {
-                sParent = Integer.toHexString(cObject.hashCode()) + ":" + cObject.getClass().getCanonicalName();
+                sParent = String.format("%1$s:%2$s", Integer.toHexString(cObject.hashCode()), cObject.getClass().getName());
             } else {
                 sParent = null;
             }
 
             if (scanned.contains(cObject)) {
                 if (debugOn) {
-                    AsyncWorldEditMain.log("* Skip:\t" + sParent);
+                    log(String.format("* Skip:\t%1$s", sParent));
                 }
             } else {
                 int added = 0;
                 if (debugOn) {
-                    AsyncWorldEditMain.log("* Scanning:\t" + sParent);
+                    log(String.format("* Scanning:\t%1$s", sParent));
                 }
                 try {
                     for (ScannerQueueEntry f : unpack(cClass, cObject)) {
@@ -160,7 +187,7 @@ public class ClassScanner {
                             String classMsg = null;
                             if (debugOn) {
                                 final Field field = f.getField();
-                                final String sValue = Integer.toHexString(f.getValue().hashCode()) + ":" + f.getValueClass().getCanonicalName();
+                                final String sValue = String.format("%1$s:%2$s", Integer.toHexString(f.getValue().hashCode()), f.getValueClass().getName());
                                 final String sField = field != null ? field.getName() : "?";
 
                                 classMsg = String.format("%s = %s", sField, sValue);
@@ -169,10 +196,10 @@ public class ClassScanner {
                             for (Class<?> type : types) {
                                 if (type.isAssignableFrom(ct)) {
                                     if (debugOn) {
-                                        AsyncWorldEditMain.log("* F " + classMsg);
+                                        log(String.format("* F %1$s", classMsg));
                                     }
 
-                                    result.add(new ClassScannerResult(t, t.getClass(), f.getParent(), f.getField()));                                    
+                                    result.add(new ClassScannerResult(t, t.getClass(), f.getParent(), f.getField()));
                                     break;
                                 }
                             }
@@ -183,34 +210,35 @@ public class ClassScanner {
                                 added++;
 
                                 if (debugOn) {
-                                    AsyncWorldEditMain.log("* + " + classMsg);
+                                    log(String.format("* + %1$s", classMsg));
                                 }
                             } else if (debugOn) {
-                                AsyncWorldEditMain.log("* - " + classMsg);
+                                log(String.format("* - %1$s", classMsg));
                             }
 
                         }
                     }
-                } catch (Exception ex) {
-                    AsyncWorldEditMain.log("-----------------------------------------------------------------------");
-                    AsyncWorldEditMain.log("Warning: Class scanner encountered an error while scanning class");
-                    AsyncWorldEditMain.log("Exception: " + ex.getMessage());
+                } catch (Throwable ex) {
+                    log("-----------------------------------------------------------------------");
+                    log("Warning: Class scanner encountered an error while scanning class");
+                    log(String.format("Exception: %1$s, %2$s", ex.getClass().getName(),
+                            ex.getMessage()));
                     ExceptionHelper.printStack(ex, "");
-                    AsyncWorldEditMain.log("Class: " + cClass);
-                    AsyncWorldEditMain.log("Object: " + cObject);
-                    AsyncWorldEditMain.log("Send this message to the author of the plugin!");
-                    AsyncWorldEditMain.log("https://github.com/SBPrime/AsyncWorldEdit/issues");
-                    AsyncWorldEditMain.log("-----------------------------------------------------------------------");
+                    log(String.format("Class: %1$s", cClass));
+                    log(String.format("Object: %1$s", cObject));
+                    log("Send this message to the author of the plugin!");
+                    log("https://github.com/SBPrime/AsyncWorldEdit/issues");
+                    log("-----------------------------------------------------------------------");
                 }
                 scanned.add(cObject);
                 if (debugOn) {
-                    AsyncWorldEditMain.log("* Added:\t" + added + " objects.");
+                    log(String.format("* Added:\t%1$s objects.", added));
                 }
             }
         }
 
         if (debugOn) {
-            AsyncWorldEditMain.log("****************************************************************");
+            log("****************************************************************");
         }
         return result;
     }
@@ -223,6 +251,7 @@ public class ClassScanner {
      */
     private static boolean isPrimitive(Class<?> oClass) {
         return oClass.isPrimitive()
+                || (Character.class.isAssignableFrom(oClass))
                 || (Number.class.isAssignableFrom(oClass))
                 || (Boolean.class.isAssignableFrom(oClass))
                 || (String.class.isAssignableFrom(oClass))
@@ -236,7 +265,7 @@ public class ClassScanner {
      * @param o
      * @return
      */
-    private static Iterable<ScannerQueueEntry> unpack(Class<?> oClass, Object o) {
+    private Iterable<ScannerQueueEntry> unpack(Class<?> oClass, Object o) {
         HashSet<ScannerQueueEntry> result = new HashSet<ScannerQueueEntry>();
 
         if (isPrimitive(oClass) || isBlackList(oClass)) {
@@ -286,17 +315,24 @@ public class ClassScanner {
         return result;
     }
 
-    private static boolean isBlackList(Class<?> oClass) {
+    private boolean isBlackList(Class<?> oClass) {
         return isBlackList(oClass, null);
     }
 
-    private static boolean isBlackList(Class<?> oClass, Field f) {
+    private boolean isBlackList(Class<?> oClass, Field f) {
         for (ClassScannerEntry c : s_blackList) {
             if (c.isMatch(oClass, f)) {
                 return true;
             }
         }
 
+        synchronized (m_filters) {
+            for (IClassFilter filter : m_filters) {
+                if (!filter.accept(oClass, f)) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -314,7 +350,37 @@ public class ClassScanner {
             result.addAll(Arrays.asList(oClass.getDeclaredFields()));
             oClass = oClass.getSuperclass();
         }
-
         return result;
     }
+
+    @Override
+    public void addFilter(IClassFilter filter) {
+        if (filter == null) {
+            return;
+        }
+        
+        synchronized(m_filters) {
+            if (m_filters.contains(filter)) {
+                return;
+            }
+            
+            m_filters.add(filter);
+        }
+    }
+
+    @Override
+    public void removeFilter(IClassFilter filter) {
+        if (filter == null) {
+            return;
+        }
+        
+        synchronized(m_filters) {
+            if (!m_filters.contains(filter)) {
+                return;
+            }
+            
+            m_filters.remove(filter);
+        }
+    }
+    
 }

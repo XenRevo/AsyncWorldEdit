@@ -50,9 +50,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import org.bukkit.scheduler.BukkitScheduler;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import org.primesoft.asyncworldedit.AsyncWorldEditBukkit;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
 import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacer;
-import org.primesoft.asyncworldedit.playerManager.PlayerEntry;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 import org.primesoft.asyncworldedit.blockPlacer.entries.JobEntry;
 import org.primesoft.asyncworldedit.configuration.ConfigProvider;
 import org.primesoft.asyncworldedit.injector.classfactory.IOperationProcessor;
@@ -60,10 +61,12 @@ import org.primesoft.asyncworldedit.injector.scanner.ClassScanner;
 import org.primesoft.asyncworldedit.injector.scanner.ClassScannerResult;
 import org.primesoft.asyncworldedit.injector.utils.ExceptionOperationAction;
 import org.primesoft.asyncworldedit.injector.utils.OperationAction;
+import org.primesoft.asyncworldedit.strings.MessageType;
 import org.primesoft.asyncworldedit.utils.ExceptionHelper;
 import org.primesoft.asyncworldedit.utils.InOutParam;
 import org.primesoft.asyncworldedit.utils.Pair;
 import org.primesoft.asyncworldedit.utils.Reflection;
+import org.primesoft.asyncworldedit.utils.SessionCanceled;
 import org.primesoft.asyncworldedit.utils.WaitFor;
 import org.primesoft.asyncworldedit.worldedit.AsyncEditSession;
 import org.primesoft.asyncworldedit.worldedit.AsyncTask;
@@ -83,17 +86,23 @@ public class AsyncOperationProcessor implements IOperationProcessor {
     /**
      * The parent plugin
      */
-    private final AsyncWorldEditMain m_plugin;
+    private final AsyncWorldEditBukkit m_plugin;
 
     /**
      * Async block placer
      */
     protected final IBlockPlacer m_blockPlacer;
 
-    public AsyncOperationProcessor(AsyncWorldEditMain plugin) {
+    /**
+     * The class scanner
+     */
+    private final ClassScanner m_classScanner;
+
+    public AsyncOperationProcessor(AsyncWorldEditBukkit plugin, ClassScanner classScanner) {
         m_plugin = plugin;
         m_schedule = m_plugin.getServer().getScheduler();
         m_blockPlacer = m_plugin.getBlockPlacer();
+        m_classScanner = classScanner;
     }
 
     @Override
@@ -109,7 +118,7 @@ public class AsyncOperationProcessor implements IOperationProcessor {
         /**
          * What to do if scanner finds multiple different edit sessions?
          */
-        List<ClassScannerResult> sessions = ClassScanner.scan(new Class<?>[]{AsyncEditSession.class, Region.class}, op);
+        List<ClassScannerResult> sessions = m_classScanner.scan(new Class<?>[]{AsyncEditSession.class, Region.class}, op);
         if (!validate(sessions)) {
             action.Execute(op);
             return;
@@ -123,7 +132,7 @@ public class AsyncOperationProcessor implements IOperationProcessor {
         }
 
         final WaitFor wait = asyncSession.getWait();
-        final PlayerEntry playerEntry = asyncSession.getPlayer();
+        final IPlayerEntry playerEntry = asyncSession.getPlayer();
         final int jobId = m_blockPlacer.getJobId(playerEntry);
         final CancelabeEditSession cancelableSession = new CancelabeEditSession(asyncSession, asyncSession.getMask(), jobId);
         final JobEntry job = new JobEntry(playerEntry, cancelableSession, jobId, name);
@@ -141,12 +150,19 @@ public class AsyncOperationProcessor implements IOperationProcessor {
                             action.Execute(op);
 
                             return cancelableSession.getChangeSet().size();
+                        } catch (IllegalArgumentException ex) {
+                            if (ex.getCause() instanceof SessionCanceled) {
+                                m_player.say(MessageType.BLOCK_PLACER_CANCELED.format());
+                            } else {
+                                ExceptionHelper.printException(ex, String.format("Error while processing async operation %1$s", name));
+                            }
+                            return 0;
                         } catch (Exception ex) {
                             if (ex instanceof MaxChangedBlocksException) {
                                 throw (MaxChangedBlocksException) ex;
                             }
 
-                            ExceptionHelper.printException(ex, "Error while processing async operation " + name);
+                            ExceptionHelper.printException(ex, String.format("Error while processing async operation %1$s", name));
                             //Silently discard other errors :(
                             return 0;
                         }
@@ -166,7 +182,7 @@ public class AsyncOperationProcessor implements IOperationProcessor {
         /**
          * What to do if scanner finds multiple different edit sessions?
          */
-        List<ClassScannerResult> sessions = ClassScanner.scan(new Class<?>[]{AsyncEditSession.class, Region.class}, op);
+        List<ClassScannerResult> sessions = m_classScanner.scan(new Class<?>[]{AsyncEditSession.class, Region.class}, op);
         if (!validate(sessions)) {
             action.Execute(op);
             return;
@@ -181,7 +197,7 @@ public class AsyncOperationProcessor implements IOperationProcessor {
         }
 
         final WaitFor wait = asyncSession.getWait();
-        final PlayerEntry playerEntry = asyncSession.getPlayer();
+        final IPlayerEntry playerEntry = asyncSession.getPlayer();
         final int jobId = m_blockPlacer.getJobId(playerEntry);
         final CancelabeEditSession cancelableSession = new CancelabeEditSession(asyncSession, asyncSession.getMask(), jobId);
         final JobEntry job = new JobEntry(playerEntry, cancelableSession, jobId, name);
@@ -214,14 +230,14 @@ public class AsyncOperationProcessor implements IOperationProcessor {
         AsyncEditSession session = null;
 
         if (debugOn) {
-            AsyncWorldEditMain.log("****************************************************************");
-            AsyncWorldEditMain.log("* Validating scann results");
-            AsyncWorldEditMain.log("****************************************************************");
+            log("****************************************************************");
+            log("* Validating scann results");
+            log("****************************************************************");
         }
 
         if (sessions.isEmpty()) {
             if (debugOn) {
-                AsyncWorldEditMain.log("* No entries");
+                log("* No entries");
             }
             return false;
         }
@@ -234,11 +250,11 @@ public class AsyncOperationProcessor implements IOperationProcessor {
                 if (session == null) {
                     session = s;
                     if (debugOn) {
-                        AsyncWorldEditMain.log("* Found EditSession");
+                        log("* Found EditSession");
                     }
                 } else if (session != s) {
                     if (debugOn) {
-                        AsyncWorldEditMain.log("* Found EditSessions do not match");
+                        log("* Found EditSessions do not match");
                     }
                     //We support only single edit session at this moment
                     return false;
@@ -248,7 +264,7 @@ public class AsyncOperationProcessor implements IOperationProcessor {
 
         if (debugOn) {
             if (session == null) {
-                AsyncWorldEditMain.log("* No EditSession found");
+                log("* No EditSession found");
             }
         }
         return session != null;
@@ -268,9 +284,9 @@ public class AsyncOperationProcessor implements IOperationProcessor {
 
         boolean debugOn = ConfigProvider.isDebugOn();
         if (debugOn) {
-            AsyncWorldEditMain.log("****************************************************************");
-            AsyncWorldEditMain.log("* Injecting classes");
-            AsyncWorldEditMain.log("****************************************************************");
+            log("****************************************************************");
+            log("* Injecting classes");
+            log("****************************************************************");
         }
 
         for (ClassScannerResult entry : entries) {
@@ -284,13 +300,13 @@ public class AsyncOperationProcessor implements IOperationProcessor {
 
             if (type == aesClass) {
                 if (debugOn) {
-                    AsyncWorldEditMain.log("* Injecting EditSession to " + parent.getClass().getName() + " " + field.getName());
+                    log(String.format("* Injecting EditSession to %1$s %2$s", parent.getClass().getName(), field.getName()));
                 }
-                
-                Reflection.set(parent, field, value, "edit session");                
+
+                Reflection.set(parent, field, value, "edit session");
             } else if (regionClass.isAssignableFrom(type)) {
                 if (debugOn) {
-                    AsyncWorldEditMain.log("* Stored region entry ");
+                    log("* Stored region entry ");
                 }
 
                 Region r = (Region) entry.getValue();
@@ -316,9 +332,9 @@ public class AsyncOperationProcessor implements IOperationProcessor {
                     continue;
                 }
                 if (debugOn) {
-                    AsyncWorldEditMain.log("* Injecting Region to " + parent.getClass().getName() + " " + field.getName());
+                    log(String.format("* Injecting Region to %1$s %2$s", parent.getClass().getName(), field.getName()));
                 }
-                
+
                 Reflection.set(parent, field, region, "region");
             }
         }

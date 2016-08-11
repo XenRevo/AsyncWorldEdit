@@ -69,17 +69,20 @@ import java.util.Iterator;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.bukkit.World;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import org.primesoft.asyncworldedit.AsyncWorldEditBukkit;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
+import org.primesoft.asyncworldedit.api.IWorld;
 import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacer;
+import org.primesoft.asyncworldedit.api.blockPlacer.entries.IJobEntry;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 import org.primesoft.asyncworldedit.api.taskdispatcher.ITaskDispatcher;
+import org.primesoft.asyncworldedit.api.utils.IFunc;
+import org.primesoft.asyncworldedit.api.worldedit.IThreadSafeEditSession;
 import org.primesoft.asyncworldedit.configuration.ConfigProvider;
-import org.primesoft.asyncworldedit.playerManager.PlayerEntry;
 import org.primesoft.asyncworldedit.blockPlacer.*;
 import org.primesoft.asyncworldedit.blockPlacer.entries.ActionEntryEx;
-import org.primesoft.asyncworldedit.blockPlacer.entries.JobEntry;
 import org.primesoft.asyncworldedit.blockPlacer.entries.UndoJob;
 import org.primesoft.asyncworldedit.utils.ActionEx;
-import org.primesoft.asyncworldedit.utils.Func;
 import org.primesoft.asyncworldedit.utils.MutexProvider;
 import org.primesoft.asyncworldedit.utils.Reflection;
 import org.primesoft.asyncworldedit.worldedit.entity.BaseEntityWrapper;
@@ -90,12 +93,12 @@ import org.primesoft.asyncworldedit.worldedit.world.AsyncWorld;
  *
  * @author SBPrime
  */
-public class ThreadSafeEditSession extends EditSessionStub {
+public class ThreadSafeEditSession extends EditSessionStub implements IThreadSafeEditSession {
 
     /**
      * Plugin instance
      */
-    protected final AsyncWorldEditMain m_plugin;
+    protected final AsyncWorldEditBukkit m_plugin;
 
     /**
      * Async block placer
@@ -131,17 +134,17 @@ public class ThreadSafeEditSession extends EditSessionStub {
     /**
      * Number of async tasks
      */
-    private final HashSet<JobEntry> m_asyncTasks;
+    private final HashSet<IJobEntry> m_asyncTasks;
 
     /**
      * Player
      */
-    protected final PlayerEntry m_player;
+    protected final IPlayerEntry m_player;
 
     /**
      * Current craftbukkit world
      */
-    private final World m_bukkitWorld;
+    private final IWorld m_bukkitWorld;
 
     /**
      * The event bus
@@ -163,41 +166,47 @@ public class ThreadSafeEditSession extends EditSessionStub {
      */
     private final com.sk89q.worldedit.world.World m_world;
 
+    @Override
     public Object getMutex() {
         return m_mutex;
     }
 
+    @Override
     public IBlockPlacer getBlockPlacer() {
         return m_blockPlacer;
     }
 
-    public PlayerEntry getPlayer() {
+    @Override
+    public IPlayerEntry getPlayer() {
         return m_player;
     }
 
-    public World getCBWorld() {
+    @Override
+    public IWorld getCBWorld() {
         return m_bukkitWorld;
     }
 
+    @Override
     public EventBus getEventBus() {
         return m_eventBus;
     }
 
+    @Override
     public EditSessionEvent getEditSessionEvent() {
         return m_editSessionEvent;
     }
 
     protected boolean isAsyncEnabled() {
-        return m_asyncForced || (m_player.getMode() && !m_asyncDisabled);
+        return m_asyncForced || (m_player.getAweMode() && !m_asyncDisabled);
     }
 
-    public ThreadSafeEditSession(AsyncWorldEditMain plugin,
-            PlayerEntry player, EventBus eventBus, com.sk89q.worldedit.world.World world,
+    public ThreadSafeEditSession(AsyncWorldEditBukkit plugin,
+            IPlayerEntry player, EventBus eventBus, com.sk89q.worldedit.world.World world,
             int maxBlocks, @Nullable BlockBag blockBag, EditSessionEvent event) {
 
         super(eventBus, AsyncWorld.wrap(world, player), maxBlocks, blockBag, event);
 
-        m_asyncTasks = new HashSet<JobEntry>();
+        m_asyncTasks = new HashSet<IJobEntry>();
         m_plugin = plugin;
         m_blockPlacer = plugin.getBlockPlacer();
         m_dispatcher = plugin.getTaskDispatcher();
@@ -208,7 +217,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
         m_eventBus = eventBus;
 
         if (world != null) {
-            m_bukkitWorld = plugin.getServer().getWorld(world.getName());
+            m_bukkitWorld = plugin.getWorld(world.getName());
         } else {
             m_bukkitWorld = null;
         }
@@ -224,7 +233,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
         ChangeSet changeSet = getChangeSet();
 
         if (changesetExtent == null || changeSet == null) {
-            AsyncWorldEditMain.log("Unable to get the changeSet from EditSession, undo and redo broken.");
+            log("Unable to get the changeSet from EditSession, undo and redo broken.");
             return;
         }
 
@@ -247,6 +256,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
         return r;
     }
 
+    @Override
     public boolean setBlock(int jobId, Vector position, BaseBlock block, Stage stage) throws WorldEditException {
         boolean isAsync = isAsyncEnabled();
         boolean r = super.setBlock(VectorWrapper.wrap(position, jobId, isAsync, m_player),
@@ -257,6 +267,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
         return r;
     }
 
+    @Override
     public boolean setBlockIfAir(Vector pt, BaseBlock block, int jobId)
             throws MaxChangedBlocksException {
         boolean isAsync = isAsyncEnabled();
@@ -271,6 +282,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
                 BaseBlockWrapper.wrap(block, m_jobId, isAsync, m_player));
     }
 
+    @Override
     public boolean setBlock(Vector pt, Pattern pat, int jobId)
             throws MaxChangedBlocksException {
         m_jobId = jobId;
@@ -283,6 +295,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
         return r;
     }
 
+    @Override
     public boolean setBlock(Vector pt, BaseBlock block, int jobId)
             throws MaxChangedBlocksException {
         boolean isAsync = isAsyncEnabled();
@@ -338,7 +351,6 @@ public class ThreadSafeEditSession extends EditSessionStub {
     }
 
     @Override
-
     public boolean setBlock(Vector position, BaseBlock block) throws MaxChangedBlocksException {
         boolean isAsync = isAsyncEnabled();
         boolean r = super.setBlock(VectorWrapper.wrap(position, m_jobId, isAsync, m_player),
@@ -376,7 +388,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public BaseBlock getBlock(final Vector position) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(getWorld(), new Func<BaseBlock>() {
+        return m_dispatcher.performSafe(getWorld(), new IFunc<BaseBlock>() {
             @Override
             public BaseBlock execute() {
                 return es.doGetBlock(position);
@@ -388,7 +400,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public int getBlockData(final Vector position) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<Integer>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<Integer>() {
             @Override
             public Integer execute() {
                 return es.doGetBlockData(position);
@@ -400,7 +412,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public int getBlockType(final Vector position) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<Integer>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<Integer>() {
             @Override
             public Integer execute() {
                 return es.doGetBlockType(position);
@@ -412,7 +424,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public BaseBlock getLazyBlock(final Vector position) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<BaseBlock>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<BaseBlock>() {
             @Override
             public BaseBlock execute() {
                 return es.doGetLazyBlock(position);
@@ -424,7 +436,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public BaseBiome getBiome(final Vector2D position) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<BaseBiome>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<BaseBiome>() {
             @Override
             public BaseBiome execute() {
                 return es.doGetBiome(position);
@@ -436,7 +448,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public int getBlockChangeCount() {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(this), new Func<Integer>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(this), new IFunc<Integer>() {
             @Override
             public Integer execute() {
                 return es.doGetBlockChangeCount();
@@ -448,7 +460,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public int getBlockChangeLimit() {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(this), new Func<Integer>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(this), new IFunc<Integer>() {
             @Override
             public Integer execute() {
                 return es.doGetBlockChangeLimit();
@@ -460,7 +472,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public List<Countable<Integer>> getBlockDistribution(final Region region) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<List<Countable<Integer>>>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<List<Countable<Integer>>>() {
             @Override
             public List<Countable<Integer>> execute() {
                 return es.doGetBlockDistribution(region);
@@ -472,7 +484,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public List<Countable<BaseBlock>> getBlockDistributionWithData(final Region region) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<List<Countable<BaseBlock>>>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<List<Countable<BaseBlock>>>() {
             @Override
             public List<Countable<BaseBlock>> execute() {
                 return es.doGetBlockDistributionWithData(region);
@@ -484,7 +496,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public List<? extends Entity> getEntities() {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<List<? extends Entity>>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<List<? extends Entity>>() {
             @Override
             public List<? extends Entity> execute() {
                 return es.doGetEntities();
@@ -496,7 +508,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public List<? extends Entity> getEntities(final Region region) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<List<? extends Entity>>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<List<? extends Entity>>() {
             @Override
             public List<? extends Entity> execute() {
                 return es.doGetEntities(region);
@@ -508,7 +520,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public int getHighestTerrainBlock(final int x, final int z, final int minY, final int maxY) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<Integer>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<Integer>() {
             @Override
             public Integer execute() {
                 return es.doGetHighestTerrainBlock(x, z, minY, maxY);
@@ -521,7 +533,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
             final int minY, final int maxY, final boolean naturalOnly) {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<Integer>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<Integer>() {
             @Override
             public Integer execute() {
                 return es.doGetHighestTerrainBlock(x, z, minY, maxY, naturalOnly);
@@ -533,7 +545,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public Vector getMaximumPoint() {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<Vector>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<Vector>() {
             @Override
             public Vector execute() {
                 return es.doGetMaximumPoint();
@@ -545,7 +557,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     public Vector getMinimumPoint() {
         final ThreadSafeEditSession es = this;
 
-        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new Func<Vector>() {
+        return m_dispatcher.performSafe(MutexProvider.getMutex(getWorld()), new IFunc<Vector>() {
             @Override
             public Vector execute() {
                 return es.doGetMinimumPoint();
@@ -565,6 +577,11 @@ public class ThreadSafeEditSession extends EditSessionStub {
         cancelJobs(jobId);
 
         UndoProcessor.processUndo(this, this, sess);
+    }
+
+    @Override
+    public void redo(EditSession sess) {
+        RedoProcessor.processRedo(this, this, sess);
     }
 
     @Override
@@ -609,6 +626,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
      *
      * @param value true to enable async mode force
      */
+    @Override
     public void setAsyncForced(boolean value) {
         m_asyncForced = value;
     }
@@ -618,6 +636,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
      *
      * @return
      */
+    @Override
     public boolean isAsyncForced() {
         return m_asyncForced;
     }
@@ -628,6 +647,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
      * @param operationName
      * @return
      */
+    @Override
     public boolean checkAsync(String operationName) {
         try {
             return checkAsync(WorldeditOperations.valueOf(operationName));
@@ -644,7 +664,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
      */
     public boolean checkAsync(WorldeditOperations operation) {
         boolean result = m_asyncForced || (ConfigProvider.isAsyncAllowed(operation)
-                && m_player.getMode());
+                && m_player.getAweMode());
 
         m_asyncDisabled = !result;
         return result;
@@ -653,6 +673,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
     /**
      * Reset async disabled inner state (enable async mode)
      */
+    @Override
     public void resetAsync() {
         m_asyncDisabled = false;
     }
@@ -666,7 +687,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
         int minId = jobId;
 
         synchronized (m_asyncTasks) {
-            for (JobEntry job : m_asyncTasks) {
+            for (IJobEntry job : m_asyncTasks) {
                 int id = job.getJobId();
                 if (id < minId) {
                     minId = id;
@@ -677,7 +698,7 @@ public class ThreadSafeEditSession extends EditSessionStub {
             }
             minId--;
             if (minId >= 0 && minId != jobId) {
-                JobEntry job = m_blockPlacer.getJob(m_player, minId);
+                IJobEntry job = m_blockPlacer.getJob(m_player, minId);
                 if (job != null && !(job instanceof UndoJob)) {
                     m_blockPlacer.cancelJob(m_player, job.getJobId());
                 }
@@ -690,7 +711,8 @@ public class ThreadSafeEditSession extends EditSessionStub {
      *
      * @param job
      */
-    public void addAsync(JobEntry job) {
+    @Override
+    public void addAsync(IJobEntry job) {
         synchronized (m_asyncTasks) {
             m_asyncTasks.add(job);
         }
@@ -701,7 +723,8 @@ public class ThreadSafeEditSession extends EditSessionStub {
      *
      * @param job
      */
-    public void removeAsync(JobEntry job) {
+    @Override
+    public void removeAsync(IJobEntry job) {
         synchronized (m_asyncTasks) {
             m_asyncTasks.remove(job);
         }
@@ -776,11 +799,22 @@ public class ThreadSafeEditSession extends EditSessionStub {
         return super.getMinimumPoint();
     }
 
+    @Override
     public Iterator<Change> doUndo() {
         return getChangeSet().backwardIterator();
     }
 
     public void doRedo(EditSession session) {
         super.redo(session);
+    }
+
+    @Override
+    public ChangeSet getRootChangeSet() {
+        return getChangeSet();
+    }
+
+    @Override
+    public Iterator<Change> doRedo() {
+        return getChangeSet().forwardIterator();
     }
 }

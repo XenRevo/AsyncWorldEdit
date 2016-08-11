@@ -1,6 +1,6 @@
 /*
  * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
- * Copyright (c) 2014, SBPrime <https://github.com/SBPrime/>
+ * Copyright (c) 2016, SBPrime <https://github.com/SBPrime/>
  * Copyright (c) AsyncWorldEdit contributors
  *
  * All rights reserved.
@@ -38,37 +38,53 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.primesoft.asyncworldedit.blockshub;
 
-package org.primesoft.asyncworldedit.blockPlacer.entries;
-
-import com.sk89q.worldedit.Vector;
-import org.primesoft.asyncworldedit.blockPlacer.BlockPlacerEntry;
-import org.primesoft.asyncworldedit.blockPlacer.IBlockPlacerLocationEntry;
-import org.primesoft.asyncworldedit.worldedit.world.AsyncWorld;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
+import org.primesoft.blockshub.IBlocksHubApi;
+import org.primesoft.blockshub.IBlocksHubApiProvider;
 
 /**
  *
  * @author SBPrime
  */
-public abstract class WorldExtentBlockEntry extends BlockPlacerEntry implements IBlockPlacerLocationEntry {
-    protected final Vector m_location;
-    protected final String m_worldName;
+class BlocksHubV2Factory implements IBlocksHubFactory {
+    private static final String NAME = "BlocksHub v2.x";
 
-    public WorldExtentBlockEntry(AsyncWorld worldExtent,
-            int jobId, Vector location) {
-        super(jobId, false);
+    @Override
+    public String getName() {
+        return NAME;
+    }
+    
+    public BlocksHubV2Factory() {
+    }
+
+    @Override
+    public IBlocksHubIntegration create(Object blocksHub) {
+                if (blocksHub == null) {
+            return null;
+        }
         
-        m_location = location;
-        m_worldName = worldExtent.getName();
+        if (!(blocksHub instanceof IBlocksHubApiProvider)) {
+            log(String.format("%1$s: ...wrong plugin type", NAME));
+            return null;
+        }
+        
+        IBlocksHubApiProvider apiProvider = (IBlocksHubApiProvider)blocksHub;
+        IBlocksHubApi api = apiProvider.getApi();
+        
+        if (api == null) {
+            log(String.format("%1$s: ...API not available", NAME));
+            return null;
+        }
+        
+        double apiVersion = api.getVersion();
+        if (apiVersion < 2 || apiVersion >= 3) {
+            log(String.format("%1$s: ...unsupported API v%2$s, supported 2.x", NAME, apiVersion));
+            return null;
+        }
+        
+        return new BlocksHubIntegrationV2(api);
     }
-
-    @Override
-    public String getWorldName() {
-        return m_worldName;
-    }
-
-    @Override
-    public Vector getLocation() {
-        return m_location;
-    }
+    
 }

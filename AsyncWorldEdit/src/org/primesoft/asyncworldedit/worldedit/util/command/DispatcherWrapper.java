@@ -39,7 +39,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.primesoft.asyncworldedit.worldedit.utils.command;
+package org.primesoft.asyncworldedit.worldedit.util.command;
 
 import com.sk89q.minecraft.util.commands.CommandException;
 import com.sk89q.minecraft.util.commands.CommandLocals;
@@ -101,7 +101,7 @@ public class DispatcherWrapper implements Dispatcher {
     }
 
     @Override
-    public boolean call(String arguments, CommandLocals locals, String[] parentCommands) throws CommandException {        
+    public Object call(String arguments, CommandLocals locals, String[] parentCommands) throws CommandException {        
         Map<Object, Object> valuesMap = Reflection.get(locals, Map.class, "locals", "Unable to get locals, player not injected.");
         Map.Entry<Object, Object>[] values = valuesMap.entrySet().toArray(new Map.Entry[0]);
         if (values != null) {

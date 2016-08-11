@@ -1,6 +1,6 @@
 /*
  * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
- * Copyright (c) 2014, SBPrime <https://github.com/SBPrime/>
+ * Copyright (c) 2016, SBPrime <https://github.com/SBPrime/>
  * Copyright (c) AsyncWorldEdit contributors
  *
  * All rights reserved.
@@ -38,23 +38,58 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.primesoft.asyncworldedit.platform.bukkit;
 
-package org.primesoft.asyncworldedit.utils;
+import java.util.UUID;
+import org.bukkit.Chunk;
+import org.bukkit.World;
+import org.primesoft.asyncworldedit.api.IChunk;
+import org.primesoft.asyncworldedit.api.IWorld;
 
 /**
  *
  * @author SBPrime
- * @param <TResult>
- * @param <TParam>
- * @param <TException>
  */
-public interface FuncParamEx<TResult, TParam, TException extends Exception> {
+public class BukkitWorld implements IWorld {
+    private final World m_world;
 
-    /**
-     *
-     * @param param
-     * @return
-     * @throws TException
-     */
-    TResult execute(TParam param) throws TException;
+    public BukkitWorld(World world) {
+        m_world = world;
+    }
+
+    public World getWorld() {
+        return m_world;
+    }
+
+    @Override
+    public UUID getUID() {
+        return m_world.getUID();
+    }
+
+    @Override
+    public String getName() {
+        return m_world.getName();
+    }
+
+    @Override
+    public void regenerateChunk(int cx, int cz) {
+        m_world.regenerateChunk(cx, cz);
+    }
+
+    @Override
+    public boolean isChunkLoaded(int cx, int cz) {
+        return m_world.isChunkLoaded(cx, cz);
+    }
+
+    @Override
+    public IChunk getChunkAt(int cx, int cz) {
+        Chunk chunk = m_world.getChunkAt(cx, cz);
+
+        if (chunk == null) {
+            return null;
+        }
+
+        return new BukkitChunk(chunk);
+    }
+
 }

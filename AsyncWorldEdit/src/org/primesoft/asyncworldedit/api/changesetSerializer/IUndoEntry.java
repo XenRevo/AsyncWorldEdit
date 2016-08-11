@@ -1,7 +1,7 @@
 /*
- * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
- * Copyright (c) 2014, SBPrime <https://github.com/SBPrime/>
- * Copyright (c) AsyncWorldEdit contributors
+ * AsyncWorldEdit API
+ * Copyright (c) 2016, SBPrime <https://github.com/SBPrime/>
+ * Copyright (c) AsyncWorldEdit API contributors
  *
  * All rights reserved.
  *
@@ -38,15 +38,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.primesoft.asyncworldedit.utils;
+package org.primesoft.asyncworldedit.api.changesetSerializer;
 
 /**
  *
  * @author SBPrime
- * @param <T> Function result type
  */
-public interface Func<T> {
-    T execute();
-}
+public interface IUndoEntry {
 
+    /**
+     * Get the serialized Change
+     *
+     * @return
+     */
+    byte[] getData();
+
+    /**
+     * Get the Change type
+     *
+     * @return
+     */
+    String getType();
+}

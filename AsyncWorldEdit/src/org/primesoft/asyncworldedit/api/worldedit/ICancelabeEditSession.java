@@ -1,7 +1,7 @@
 /*
- * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
- * Copyright (c) 2014, SBPrime <https://github.com/SBPrime/>
- * Copyright (c) AsyncWorldEdit contributors
+ * AsyncWorldEdit API
+ * Copyright (c) 2015, SBPrime <https://github.com/SBPrime/>
+ * Copyright (c) AsyncWorldEdit API contributors
  *
  * All rights reserved.
  *
@@ -38,38 +38,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.primesoft.asyncworldedit.blockPlacer.entries;
+package org.primesoft.asyncworldedit.api.worldedit;
 
-import com.sk89q.worldedit.Vector;
-import org.bukkit.event.block.BlockPlaceEvent;
-import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacer;
-import org.primesoft.asyncworldedit.blockPlacer.BlockPlacer;
-import org.primesoft.asyncworldedit.utils.Action;
-import org.primesoft.asyncworldedit.worldedit.world.AsyncWorld;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 
 /**
  *
  * @author SBPrime
  */
-public class WorldExtentActionEntry
-        extends WorldExtentBlockEntry {
+public interface ICancelabeEditSession extends IAweEditSession {
 
-    private final Action m_function;
+    void cancel();
 
-    public WorldExtentActionEntry(AsyncWorld worldExtent,
-            int jobId, Vector location, Action function) {
-        super(worldExtent, jobId, location);
-        m_function = function;
-    }
+    int getJobId();
 
-    @Override
-    public boolean process(IBlockPlacer bp) {
-        m_function.execute();
+    IThreadSafeEditSession getParent();
 
-        if (m_worldName != null) {
-            ((BlockPlacer)bp).getPhysicsWatcher().removeLocation(m_worldName, m_location);
-        }
-        
-        return true;
-    }
+    IPlayerEntry getPlayer();
+
+    boolean isCanceled();
+
+    void resetAsync();    
 }

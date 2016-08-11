@@ -1,7 +1,7 @@
 /*
- * AsyncWorldEdit a performance improvement plugin for Minecraft WorldEdit plugin.
- * Copyright (c) 2014, SBPrime <https://github.com/SBPrime/>
- * Copyright (c) AsyncWorldEdit contributors
+ * AsyncWorldEdit API
+ * Copyright (c) 2015, SBPrime <https://github.com/SBPrime/>
+ * Copyright (c) AsyncWorldEdit API contributors
  *
  * All rights reserved.
  *
@@ -41,7 +41,7 @@
 package org.primesoft.asyncworldedit.api.taskdispatcher;
 
 /**
- *
+ * Sipme operation to perform using the dispatcher
  * @author SBPrime
  */
 public interface IDispatcherEntry {
@@ -53,7 +53,7 @@ public interface IDispatcherEntry {
     Object getMutex();
 
     /**
-     * Process the entry
+     * Process the entry, the operation to perform
      * @return 
      */
     boolean Process();

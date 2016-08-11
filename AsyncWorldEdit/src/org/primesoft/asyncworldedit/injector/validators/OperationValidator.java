@@ -42,7 +42,7 @@ package org.primesoft.asyncworldedit.injector.validators;
 
 import com.sk89q.worldedit.function.operation.Operation;
 import java.util.regex.Pattern;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
 import org.primesoft.asyncworldedit.configuration.ConfigProvider;
 
 /**
@@ -80,21 +80,21 @@ public class OperationValidator {
     public static boolean isValid(Operation op) {
         boolean debugOn = ConfigProvider.isDebugOn();
         Class c = op.getClass();
-        String className = c.getCanonicalName();
+        String className = c.getName();
 
         if (debugOn) {
-            AsyncWorldEditMain.log("****************************************************************");
-            AsyncWorldEditMain.log("* Validating operation");
-            AsyncWorldEditMain.log("****************************************************************");
+            log("****************************************************************");
+            log("* Validating operation");
+            log("****************************************************************");
         }
         try {
             for (Pattern p : s_blackList) {
                 if (p.matcher(className).matches()) {
                     if (debugOn) {
-                        AsyncWorldEditMain.log("*");
-                        AsyncWorldEditMain.log("* Found on blacklist");
-                        AsyncWorldEditMain.log("* Opeation:\t" + className);
-                        AsyncWorldEditMain.log("* Pattern:\t" + p.pattern());
+                        log("*");
+                        log("* Found on blacklist");
+                        log(String.format("* Opeation:\t%1$s", className));
+                        log(String.format("* Pattern:\t%1$s", p.pattern()));
                     }
                     return false;
                 }
@@ -103,23 +103,23 @@ public class OperationValidator {
             for (Pattern p : s_whiteList) {
                 if (p.matcher(className).matches()) {
                     if (debugOn) {
-                        AsyncWorldEditMain.log("*");
-                        AsyncWorldEditMain.log("* Found on whitelist");
-                        AsyncWorldEditMain.log("* Opeation:\t" + className);
-                        AsyncWorldEditMain.log("* Pattern:\t" + p.pattern());
+                        log("*");
+                        log("* Found on whitelist");
+                        log(String.format("* Opeation:\t%1$s", className));
+                        log(String.format("* Pattern:\t%1$s", p.pattern()));
                     }
                     return true;
                 }
             }
 
             if (debugOn) {
-                AsyncWorldEditMain.log("*");
-                AsyncWorldEditMain.log("* No match found");
+                log("*");
+                log("* No match found");
             }
             return false;
         } finally {
             if (debugOn) {
-                AsyncWorldEditMain.log("****************************************************************");
+                log("****************************************************************");
             }
         }
     }

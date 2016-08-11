@@ -46,9 +46,9 @@ import com.sk89q.worldedit.LocalEntity;
 import com.sk89q.worldedit.Vector;
 import com.sk89q.worldedit.blocks.BaseBlock;
 import com.sk89q.worldedit.regions.Region;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
+import org.primesoft.asyncworldedit.AsyncWorldEditBukkit;
 import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacer;
-import org.primesoft.asyncworldedit.playerManager.PlayerEntry;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 import org.primesoft.asyncworldedit.blockPlacer.entries.EntityEntry;
 import org.primesoft.asyncworldedit.utils.Reflection;
 
@@ -73,7 +73,7 @@ public class CuboidClipboardWrapper extends ProxyCuboidClipboard {
     /**
      * Player
      */
-    private final PlayerEntry m_player;
+    private final IPlayerEntry m_player;
 
     /**
      * Inject entities to CuboidClipboard
@@ -95,15 +95,15 @@ public class CuboidClipboardWrapper extends ProxyCuboidClipboard {
         return Reflection.get(cc, Object.class, "entities", "Unable to get entities");
     }
 
-    public CuboidClipboardWrapper(PlayerEntry player, CuboidClipboard parrent) {
+    public CuboidClipboardWrapper(IPlayerEntry player, CuboidClipboard parrent) {
         this(player, parrent, -1);
     }
 
-    public CuboidClipboardWrapper(PlayerEntry player, CuboidClipboard parrent, int jobId) {
+    public CuboidClipboardWrapper(IPlayerEntry player, CuboidClipboard parrent, int jobId) {
         super(parrent);
 
         m_jobId = jobId;
-        m_blocksPlacer = AsyncWorldEditMain.getInstance().getBlockPlacer();
+        m_blocksPlacer = AsyncWorldEditBukkit.getInstance().getBlockPlacer();
         m_player = player;
     }
 

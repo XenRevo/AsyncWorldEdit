@@ -44,23 +44,30 @@ import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacer;
 import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacerListener;
 import com.sk89q.worldedit.MaxChangedBlocksException;
 import org.bukkit.scheduler.BukkitScheduler;
-import org.primesoft.asyncworldedit.AsyncWorldEditMain;
 import org.primesoft.asyncworldedit.blockPlacer.entries.JobEntry;
 import org.primesoft.asyncworldedit.blockPlacer.entries.UndoJob;
 import org.primesoft.asyncworldedit.configuration.ConfigProvider;
-import org.primesoft.asyncworldedit.configuration.PermissionGroup;
 import org.primesoft.asyncworldedit.permissions.Permission;
-import org.primesoft.asyncworldedit.playerManager.PlayerEntry;
 import org.primesoft.asyncworldedit.strings.MessageType;
-import org.primesoft.asyncworldedit.utils.FuncParamEx;
 import org.primesoft.asyncworldedit.utils.InOutParam;
 import org.primesoft.asyncworldedit.worldedit.AsyncTask;
 import org.primesoft.asyncworldedit.worldedit.CancelabeEditSession;
-import org.primesoft.asyncworldedit.worldedit.ThreadSafeEditSession;
 
 import java.util.*;
+import org.primesoft.asyncworldedit.AsyncWorldEditBukkit;
+import static org.primesoft.asyncworldedit.AsyncWorldEditBukkit.log;
 import org.primesoft.asyncworldedit.api.IPhysicsWatch;
+import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacerEntry;
+import org.primesoft.asyncworldedit.api.blockPlacer.IBlockPlacerPlayer;
+import org.primesoft.asyncworldedit.api.blockPlacer.entries.IJobEntry;
+import org.primesoft.asyncworldedit.api.blockPlacer.entries.JobStatus;
+import org.primesoft.asyncworldedit.api.configuration.IPermissionGroup;
+import org.primesoft.asyncworldedit.api.playerManager.IPlayerEntry;
 import org.primesoft.asyncworldedit.api.progressDisplay.IProgressDisplay;
+import org.primesoft.asyncworldedit.api.utils.IAsyncCommand;
+import org.primesoft.asyncworldedit.api.utils.IFuncParamEx;
+import org.primesoft.asyncworldedit.api.worldedit.ICancelabeEditSession;
+import org.primesoft.asyncworldedit.api.worldedit.IThreadSafeEditSession;
 
 /**
  *
@@ -91,12 +98,12 @@ public class BlockPlacer implements IBlockPlacer {
     /**
      * Logged events queue (per player)
      */
-    private final HashMap<PlayerEntry, BlockPlacerPlayer> m_blocks;
+    private final HashMap<IPlayerEntry, IBlockPlacerPlayer> m_blocks;
 
     /**
      * All locked queues
      */
-    private final HashSet<PlayerEntry> m_lockedQueues;
+    private final HashSet<IPlayerEntry> m_lockedQueues;
 
     /**
      * Global queue max size
@@ -131,7 +138,7 @@ public class BlockPlacer implements IBlockPlacer {
     /**
      * Parent plugin main
      */
-    private final AsyncWorldEditMain m_plugin;
+    private final AsyncWorldEditBukkit m_plugin;
     
     /**
      * Indicates that the blocks placer is paused
@@ -172,12 +179,12 @@ public class BlockPlacer implements IBlockPlacer {
      *
      * @param plugin parent
      */
-    public BlockPlacer(AsyncWorldEditMain plugin) {
+    public BlockPlacer(AsyncWorldEditBukkit plugin) {
         m_jobAddedListeners = new ArrayList<IBlockPlacerListener>();
         m_lastRunTime = System.currentTimeMillis();
         m_runNumber = 0;
-        m_blocks = new HashMap<PlayerEntry, BlockPlacerPlayer>();
-        m_lockedQueues = new HashSet<PlayerEntry>();
+        m_blocks = new HashMap<IPlayerEntry, IBlockPlacerPlayer>();
+        m_lockedQueues = new HashSet<IPlayerEntry>();
         m_scheduler = plugin.getServer().getScheduler();
         m_progressDisplay = plugin.getProgressDisplayManager();
 
@@ -255,19 +262,19 @@ public class BlockPlacer implements IBlockPlacer {
         }
         
         boolean talk = false;
-        final List<JobEntry> jobsToCancel = new ArrayList<JobEntry>();
+        final List<IJobEntry> jobsToCancel = new ArrayList<IJobEntry>();
         //Number of blocks placed for player
-        final HashMap<PlayerEntry, Integer> blocksPlaced = new HashMap<PlayerEntry, Integer>();
-        final HashMap<PermissionGroup, HashSet<PlayerEntry>> groups = new HashMap<PermissionGroup, HashSet<PlayerEntry>>();
+        final HashMap<IPlayerEntry, Integer> blocksPlaced = new HashMap<IPlayerEntry, Integer>();
+        final HashMap<IPermissionGroup, HashSet<IPlayerEntry>> groups = new HashMap<IPermissionGroup, HashSet<IPlayerEntry>>();
 
         synchronized (m_mutex) {
-            final PlayerEntry[] keys = m_blocks.keySet().toArray(new PlayerEntry[0]);
-            for (PlayerEntry player : keys) {
-                PermissionGroup group = player.getPermissionGroup();
+            final IPlayerEntry[] keys = m_blocks.keySet().toArray(new IPlayerEntry[0]);
+            for (IPlayerEntry player : keys) {
+                IPermissionGroup group = player.getPermissionGroup();
 
-                HashSet<PlayerEntry> uuids;
+                HashSet<IPlayerEntry> uuids;
                 if (!groups.containsKey(group)) {
-                    uuids = new HashSet<PlayerEntry>();
+                    uuids = new HashSet<IPlayerEntry>();
                     uuids.add(player);
                     groups.put(group, uuids);
                 } else {
@@ -289,25 +296,25 @@ public class BlockPlacer implements IBlockPlacer {
             return;
         }
 
-        for (Map.Entry<PermissionGroup, HashSet<PlayerEntry>> entry : groups.entrySet()) {
-            PermissionGroup permissionGroup = entry.getKey();
-            PlayerEntry[] keys = entry.getValue().toArray(new PlayerEntry[0]);
+        for (Map.Entry<IPermissionGroup, HashSet<IPlayerEntry>> entry : groups.entrySet()) {
+            IPermissionGroup permissionGroup = entry.getKey();
+            IPlayerEntry[] keys = entry.getValue().toArray(new IPlayerEntry[0]);
 
             processQueue(keys, permissionGroup, blocksPlaced, jobsToCancel);
         }
 
         synchronized (m_mutex) {
-            for (Map.Entry<PlayerEntry, BlockPlacerPlayer> queueEntry : m_blocks.entrySet()) {
-                PlayerEntry playerEntry = queueEntry.getKey();
-                BlockPlacerPlayer entry = queueEntry.getValue();
+            for (Map.Entry<IPlayerEntry, IBlockPlacerPlayer> queueEntry : m_blocks.entrySet()) {
+                IPlayerEntry playerEntry = queueEntry.getKey();
+                IBlockPlacerPlayer entry = queueEntry.getValue();
                 Integer cnt = blocksPlaced.get(playerEntry);
 
                 showProgress(playerEntry, entry, cnt != null ? cnt : 0, timeDelte, talk);
             }
         }
 
-        for (JobEntry job : jobsToCancel) {
-            job.setStatus(JobEntry.JobStatus.Done);
+        for (IJobEntry job : jobsToCancel) {
+            job.setStatus(JobStatus.Done);
             onJobRemoved(job);
         }
 
@@ -322,9 +329,9 @@ public class BlockPlacer implements IBlockPlacer {
      * @param blocksPlaced number of blocksplaced for players
      * @param jobsToCancel canceled blocks
      */
-    private void processQueue(final PlayerEntry[] playerUUID,
-            PermissionGroup permissionGroup,
-            final HashMap<PlayerEntry, Integer> blocksPlaced, final List<JobEntry> jobsToCancel) {
+    private void processQueue(final IPlayerEntry[] playerUUID,
+            IPermissionGroup permissionGroup,
+            final HashMap<IPlayerEntry, Integer> blocksPlaced, final List<IJobEntry> jobsToCancel) {
         InOutParam<Integer> seqNumber = InOutParam.Ref(0);
         long startTime = System.currentTimeMillis();
         int blocks = 0;
@@ -334,7 +341,7 @@ public class BlockPlacer implements IBlockPlacer {
         int maxBlocksCount = permissionGroup.getRendererBlocks();
 
         while (process) {
-            BlockPlacerEntry entry;
+            IBlockPlacerEntry entry;
             synchronized (m_mutex) {
                 entry = fetchBlocks(playerUUID, permissionGroup,
                         seqNumber, blocksPlaced, jobsToCancel);
@@ -363,26 +370,26 @@ public class BlockPlacer implements IBlockPlacer {
      * @param jobsToCancel jobs to cancel
      * @return fatched block
      */
-    private BlockPlacerEntry fetchBlocks(final PlayerEntry[] playerNames,
-            PermissionGroup permissionGroup,
+    private IBlockPlacerEntry fetchBlocks(final IPlayerEntry[] playerNames,
+            IPermissionGroup permissionGroup,
             InOutParam<Integer> seqNumber,
-            final HashMap<PlayerEntry, Integer> blocksPlaced,
-            final List<JobEntry> jobsToCancel) {
+            final HashMap<IPlayerEntry, Integer> blocksPlaced,
+            final List<IJobEntry> jobsToCancel) {
         if (playerNames == null || playerNames.length == 0) {
             return null;
         }
 
         int keyPos = seqNumber.getValue();
-        BlockPlacerEntry result = null;
+        IBlockPlacerEntry result = null;
 
         for (int retry = playerNames.length; result == null && retry > 0; retry--) {
-            final PlayerEntry player = playerNames[keyPos];
-            final BlockPlacerPlayer playerEntry = m_blocks.get(player);
+            final IPlayerEntry player = playerNames[keyPos];
+            final IBlockPlacerPlayer playerEntry = m_blocks.get(player);
             if (playerEntry != null) {
-                Queue<BlockPlacerEntry> queue = playerEntry.getQueue();
+                Queue<IBlockPlacerEntry> queue = playerEntry.getQueue();
                 synchronized (queue) {
                     if (!queue.isEmpty()) {
-                        BlockPlacerEntry entry = queue.poll();
+                        IBlockPlacerEntry entry = queue.poll();
                         if (entry != null) {
                             result = entry;
 
@@ -393,16 +400,16 @@ public class BlockPlacer implements IBlockPlacer {
                             }
                         }
                     } else {
-                        for (JobEntry job : playerEntry.getJobs()) {
-                            JobEntry.JobStatus jStatus = job.getStatus();
-                            if (jStatus == JobEntry.JobStatus.Done
-                                    || jStatus == JobEntry.JobStatus.Waiting
-                                    || jStatus == JobEntry.JobStatus.Canceled) {
+                        for (IJobEntry job : playerEntry.getJobs()) {
+                            JobStatus jStatus = job.getStatus();
+                            if (jStatus == JobStatus.Done
+                                    || jStatus == JobStatus.Waiting
+                                    || jStatus == JobStatus.Canceled) {
                                 jobsToCancel.add(job);
                             }
                         }
 
-                        for (JobEntry job : jobsToCancel) {
+                        for (IJobEntry job : jobsToCancel) {
                             playerEntry.removeJob(job);
                         }
                     }
@@ -442,8 +449,8 @@ public class BlockPlacer implements IBlockPlacer {
      * @return
      */
     @Override
-    public int getJobId(PlayerEntry player) {
-        BlockPlacerPlayer playerEntry;
+    public int getJobId(IPlayerEntry player) {
+        IBlockPlacerPlayer playerEntry;
         synchronized (m_mutex) {
             if (m_blocks.containsKey(player)) {
                 playerEntry = m_blocks.get(player);
@@ -464,12 +471,12 @@ public class BlockPlacer implements IBlockPlacer {
      * @return
      */
     @Override
-    public JobEntry getJob(PlayerEntry player, int jobId) {
+    public IJobEntry getJob(IPlayerEntry player, int jobId) {
         synchronized (m_mutex) {
             if (!m_blocks.containsKey(player)) {
                 return null;
             }
-            BlockPlacerPlayer playerEntry = m_blocks.get(player);
+            IBlockPlacerPlayer playerEntry = m_blocks.get(player);
             return playerEntry.getJob(jobId);
         }
     }
@@ -482,11 +489,11 @@ public class BlockPlacer implements IBlockPlacer {
      * @return
      */
     @Override
-    public boolean addJob(PlayerEntry player, JobEntry job) {
+    public boolean addJob(IPlayerEntry player, IJobEntry job) {
         boolean result;
 
         synchronized (m_mutex) {
-            BlockPlacerPlayer playerEntry;
+            IBlockPlacerPlayer playerEntry;
 
             if (!m_blocks.containsKey(player)) {
                 playerEntry = new BlockPlacerPlayer(player);
@@ -519,13 +526,13 @@ public class BlockPlacer implements IBlockPlacer {
      * @return
      */
     @Override
-    public boolean addTasks(PlayerEntry player, BlockPlacerEntry entry) {
+    public boolean addTasks(IPlayerEntry player, IBlockPlacerEntry entry) {
         if (player == null) {
             return false;
         }
 
         synchronized (m_mutex) {
-            BlockPlacerPlayer playerEntry;
+            IBlockPlacerPlayer playerEntry;
 
             if (!m_blocks.containsKey(player)) {
                 playerEntry = new BlockPlacerPlayer(player);
@@ -533,21 +540,23 @@ public class BlockPlacer implements IBlockPlacer {
             } else {
                 playerEntry = m_blocks.get(player);
             }
-            Queue<BlockPlacerEntry> queue = playerEntry.getQueue();
+            Queue<IBlockPlacerEntry> queue = playerEntry.getQueue();
 
-            if (m_lockedQueues.contains(player)) {
+            if (m_lockedQueues.contains(player) && !(entry instanceof JobEntry)) {
                 return false;
             }
 
             boolean bypass = !player.isAllowed(Permission.QUEUE_BYPASS);
-            PermissionGroup group = player.getPermissionGroup();
+            IPermissionGroup group = player.getPermissionGroup();
 
             int size = 0;
-            for (Map.Entry<PlayerEntry, BlockPlacerPlayer> queueEntry : m_blocks.entrySet()) {
+            for (Map.Entry<IPlayerEntry, IBlockPlacerPlayer> queueEntry : m_blocks.entrySet()) {
                 size += queueEntry.getValue().getQueue().size();
             }
 
             bypass |= entry instanceof JobEntry;
+            
+            //TODO: Add wait for queue here!
             if (m_queueMaxSize > 0 && size > m_queueMaxSize && !bypass) {
                 if (!playerEntry.isInformed()) {
                     playerEntry.setInformed(true);
@@ -570,9 +579,11 @@ public class BlockPlacer implements IBlockPlacer {
                         m_physicsWatcher.addLocation(worldName, bpEntry.getLocation());
                     }
                 }
-                if (entry instanceof JobEntry) {
-                    playerEntry.addJob((JobEntry) entry, true);
+                if (entry instanceof IJobEntry) {
+                    playerEntry.addJob((IJobEntry) entry, true);
                 }
+                
+                //TODO: Add wait for queue here!
                 if (queue.size() >= group.getQueueHardLimit() && bypass) {
                     m_lockedQueues.add(player);
                     player.say(MessageType.BLOCK_PLACER_QUEUE_FULL.format());
@@ -590,9 +601,9 @@ public class BlockPlacer implements IBlockPlacer {
      *
      * @param job
      */
-    private void waitForJob(JobEntry job) {
+    private void waitForJob(IJobEntry job) {
         if (job instanceof UndoJob) {
-            AsyncWorldEditMain.log("Warning: Undo jobs shuld not by canceled, ingoring!");
+            log("Warning: Undo jobs shuld not by canceled, ingoring!");
             return;
         }
 
@@ -602,8 +613,8 @@ public class BlockPlacer implements IBlockPlacer {
 
         final int SLEEP = 10;
         int maxWaitTime = 1000 / SLEEP;
-        JobEntry.JobStatus status = job.getStatus();
-        while (status != JobEntry.JobStatus.Initializing
+        JobStatus status = job.getStatus();
+        while (status != JobStatus.Initializing
                 && !job.isTaskDone() && maxWaitTime > 0) {
             try {
                 Thread.sleep(10);
@@ -613,16 +624,16 @@ public class BlockPlacer implements IBlockPlacer {
             status = job.getStatus();
         }
 
-        if (status != JobEntry.JobStatus.Done
-                && status != JobEntry.JobStatus.Canceled
+        if (status != JobStatus.Done
+                && status != JobStatus.Canceled
                 && !job.isTaskDone()) {
-            AsyncWorldEditMain.log("-----------------------------------------------------------------------");
-            AsyncWorldEditMain.log("Warning: timeout waiting for job to finish. Manual job cancel.");
-            AsyncWorldEditMain.log("Job Id: " + job.getJobId() + ", " + job.getName() + " Done:" + job.isTaskDone() + " Status: " + job.getStatus());
-            AsyncWorldEditMain.log("Send this message to the author of the plugin!");
-            AsyncWorldEditMain.log("-----------------------------------------------------------------------");
+            log("-----------------------------------------------------------------------");
+            log("Warning: timeout waiting for job to finish. Manual job cancel.");
+            log("Job Id: " + job.getJobId() + ", " + job.getName() + " Done:" + job.isTaskDone() + " Status: " + job.getStatus());
+            log("Send this message to the author of the plugin!");
+            log("-----------------------------------------------------------------------");
             job.cancel();
-            job.setStatus(JobEntry.JobStatus.Done);
+            job.setStatus(JobStatus.Done);
         }
     }
 
@@ -634,11 +645,11 @@ public class BlockPlacer implements IBlockPlacer {
      * @return
      */
     @Override
-    public int cancelJob(PlayerEntry player, int jobId) {
+    public int cancelJob(IPlayerEntry player, int jobId) {
         int newSize, result;
-        BlockPlacerPlayer playerEntry;
-        Queue<BlockPlacerEntry> queue = null;
-        JobEntry job = null;
+        IBlockPlacerPlayer playerEntry;
+        Queue<IBlockPlacerEntry> queue = null;
+        IJobEntry job = null;
         synchronized (m_mutex) {
             if (!m_blocks.containsKey(player)) {
                 return 0;
@@ -664,10 +675,10 @@ public class BlockPlacer implements IBlockPlacer {
         waitForJob(job);
 
         synchronized (m_mutex) {
-            Queue<BlockPlacerEntry> filtered = new ArrayDeque<BlockPlacerEntry>();
+            Queue<IBlockPlacerEntry> filtered = new ArrayDeque<IBlockPlacerEntry>();
             if (queue != null) {
                 synchronized (queue) {
-                    for (BlockPlacerEntry entry : queue) {
+                    for (IBlockPlacerEntry entry : queue) {
                         if (entry.getJobId() == jobId) {
                             if (entry instanceof IBlockPlacerLocationEntry) {
                                 IBlockPlacerLocationEntry bpEntry = (IBlockPlacerLocationEntry) entry;
@@ -675,8 +686,8 @@ public class BlockPlacer implements IBlockPlacer {
                                 if (worldName != null) {
                                     m_physicsWatcher.removeLocation(worldName, bpEntry.getLocation());
                                 }
-                            } else if (playerEntry != null && entry instanceof JobEntry) {
-                                JobEntry jobEntry = (JobEntry) entry;
+                            } else if (playerEntry != null && entry instanceof IJobEntry) {
+                                IJobEntry jobEntry = (IJobEntry) entry;
                                 playerEntry.removeJob(jobEntry);
                                 onJobRemoved(jobEntry);
                             }
@@ -692,7 +703,7 @@ public class BlockPlacer implements IBlockPlacer {
                 newSize = 0;
                 result = 0;
             }
-            PermissionGroup group = player.getPermissionGroup();
+            IPermissionGroup group = player.getPermissionGroup();
             if (newSize > 0 && playerEntry != null) {
                 playerEntry.updateQueue(filtered);
             } else if (newSize == 0) {
@@ -715,36 +726,36 @@ public class BlockPlacer implements IBlockPlacer {
      * @return
      */
     @Override
-    public int purge(PlayerEntry player) {
+    public int purge(IPlayerEntry player) {
         int result = 0;
         synchronized (m_mutex) {
             if (m_blocks.containsKey(player)) {
-                BlockPlacerPlayer playerEntry = m_blocks.get(player);
-                Queue<BlockPlacerEntry> queue = playerEntry.getQueue();
+                IBlockPlacerPlayer playerEntry = m_blocks.get(player);
+                Queue<IBlockPlacerEntry> queue = playerEntry.getQueue();
                 synchronized (queue) {
-                    for (BlockPlacerEntry entry : queue) {
+                    for (IBlockPlacerEntry entry : queue) {
                         if (entry instanceof IBlockPlacerLocationEntry) {
                             IBlockPlacerLocationEntry bpEntry = (IBlockPlacerLocationEntry) entry;
                             String name = bpEntry.getWorldName();
                             if (name != null) {
                                 m_physicsWatcher.removeLocation(name, bpEntry.getLocation());
                             }
-                        } else if (entry instanceof JobEntry) {
-                            JobEntry jobEntry = (JobEntry) entry;
+                        } else if (entry instanceof IJobEntry) {
+                            IJobEntry jobEntry = (IJobEntry) entry;
                             playerEntry.removeJob(jobEntry);
                             onJobRemoved(jobEntry);
                         }
                     }
                 }
 
-                Collection<JobEntry> jobs = playerEntry.getJobs();
-                for (JobEntry job : jobs.toArray(new JobEntry[0])) {
+                IJobEntry[] jobs = playerEntry.getJobs();
+                for (IJobEntry job : jobs) {
                     playerEntry.removeJob(job.getJobId());
                     onJobRemoved(job);
                 }
                 result = queue.size();
                 m_blocks.remove(player);
-                PermissionGroup group = player.getPermissionGroup();
+                IPermissionGroup group = player.getPermissionGroup();
                 if (group.isBarApiProgressEnabled()) {
                     hideProgressBar(player, playerEntry);
                 }
@@ -764,7 +775,7 @@ public class BlockPlacer implements IBlockPlacer {
     public int purgeAll() {
         int result = 0;
         synchronized (m_mutex) {
-            for (PlayerEntry user : getAllPlayers()) {
+            for (IPlayerEntry user : getAllPlayers()) {
                 result += purge(user);
             }
         }
@@ -778,9 +789,9 @@ public class BlockPlacer implements IBlockPlacer {
      * @return players list
      */
     @Override
-    public PlayerEntry[] getAllPlayers() {
+    public IPlayerEntry[] getAllPlayers() {
         synchronized (m_mutex) {
-            return m_blocks.keySet().toArray(new PlayerEntry[0]);
+            return m_blocks.keySet().toArray(new IPlayerEntry[0]);
         }
     }
 
@@ -791,7 +802,7 @@ public class BlockPlacer implements IBlockPlacer {
      * @return number of stored events
      */
     @Override
-    public BlockPlacerPlayer getPlayerEvents(PlayerEntry player) {
+    public IBlockPlacerPlayer getPlayerEvents(IPlayerEntry player) {
         synchronized (m_mutex) {
             if (m_blocks.containsKey(player)) {
                 return m_blocks.get(player);
@@ -806,8 +817,8 @@ public class BlockPlacer implements IBlockPlacer {
      * @param player player login
      * @return
      */
-    public String getPlayerMessage(PlayerEntry player) {
-        BlockPlacerPlayer entry = null;
+    public String getPlayerMessage(IPlayerEntry player) {
+        IBlockPlacerPlayer entry = null;
         synchronized (m_mutex) {
             if (m_blocks.containsKey(player)) {
                 entry = m_blocks.get(player);
@@ -815,7 +826,7 @@ public class BlockPlacer implements IBlockPlacer {
         }
 
         boolean bypass = player.isAllowed(Permission.QUEUE_BYPASS);
-        PermissionGroup group = player.getPermissionGroup();
+        IPermissionGroup group = player.getPermissionGroup();
         return getPlayerMessage(entry, group, bypass);
     }
 
@@ -825,7 +836,7 @@ public class BlockPlacer implements IBlockPlacer {
      * @param player player login
      * @return
      */
-    private String getPlayerMessage(BlockPlacerPlayer player, PermissionGroup group, boolean bypass) {
+    private String getPlayerMessage(IBlockPlacerPlayer player, IPermissionGroup group, boolean bypass) {
         int blocks = 0;
         double speed = 0;
         double time = 0;
@@ -853,8 +864,8 @@ public class BlockPlacer implements IBlockPlacer {
      * @param jobEntry
      */
     @Override
-    public void removeJob(final PlayerEntry player, JobEntry jobEntry) {
-        BlockPlacerPlayer playerEntry;
+    public void removeJob(final IPlayerEntry player, IJobEntry jobEntry) {
+        IBlockPlacerPlayer playerEntry;
         synchronized (m_mutex) {
             playerEntry = m_blocks.get(player);
         }
@@ -871,7 +882,7 @@ public class BlockPlacer implements IBlockPlacer {
      * @param player
      * @param entry
      */
-    private void hideProgressBar(PlayerEntry player, BlockPlacerPlayer entry) {
+    private void hideProgressBar(IPlayerEntry player, IBlockPlacerPlayer entry) {
         if (entry != null) {
             entry.setMaxQueueBlocks(0);
         }
@@ -886,7 +897,7 @@ public class BlockPlacer implements IBlockPlacer {
      * @param entry
      * @param bypass
      */
-    private void setBar(PlayerEntry player, BlockPlacerPlayer entry, boolean bypass) {
+    private void setBar(IPlayerEntry player, IBlockPlacerPlayer entry, boolean bypass) {
         int blocks = 0;
         int maxBlocks = 0;
         int jobs = 0;
@@ -895,7 +906,7 @@ public class BlockPlacer implements IBlockPlacer {
         double percentage = 100;
 
         if (entry != null) {
-            jobs = entry.getJobs().size();
+            jobs = entry.getJobs().length;
             blocks = entry.getQueue().size();
             maxBlocks = entry.getMaxQueueBlocks();
             speed = entry.getSpeed();
@@ -920,7 +931,7 @@ public class BlockPlacer implements IBlockPlacer {
      *
      * @param job
      */
-    private void onJobRemoved(JobEntry job) {
+    private void onJobRemoved(IJobEntry job) {
         synchronized (m_jobAddedListeners) {
             for (IBlockPlacerListener listener : m_jobAddedListeners) {
                 listener.jobRemoved(job);
@@ -937,12 +948,12 @@ public class BlockPlacer implements IBlockPlacer {
      * @param timeDelte ellapsed time from last run
      * @param talk "tell" the stats on chat
      */
-    private void showProgress(PlayerEntry playerEntry, BlockPlacerPlayer entry,
+    private void showProgress(IPlayerEntry playerEntry, IBlockPlacerPlayer entry,
             int placedBlocks, final long timeDelte,
             final boolean talk) {
         entry.updateSpeed(placedBlocks, timeDelte);
 
-        final PermissionGroup group = playerEntry.getPermissionGroup();
+        final IPermissionGroup group = playerEntry.getPermissionGroup();
         boolean bypass = playerEntry.isAllowed(Permission.QUEUE_BYPASS);
         if (entry.getQueue().isEmpty()) {
             if (group.isBarApiProgressEnabled()) {
@@ -964,7 +975,7 @@ public class BlockPlacer implements IBlockPlacer {
      *
      * @param player
      */
-    private void unlockQueue(final PlayerEntry player, boolean talk) {
+    private void unlockQueue(final IPlayerEntry player, boolean talk) {
         if (m_lockedQueues.contains(player)) {
             if (talk) {
                 player.say(MessageType.BLOCK_PLACER_QUEUE_UNLOCKED.format());
@@ -982,9 +993,9 @@ public class BlockPlacer implements IBlockPlacer {
      * @param action
      */
     @Override
-    public void performAsAsyncJob(final ThreadSafeEditSession editSession,
-            final PlayerEntry player, final String jobName,
-            final FuncParamEx<Integer, CancelabeEditSession, MaxChangedBlocksException> action) {
+    public void performAsAsyncJob(final IThreadSafeEditSession editSession,
+            final IPlayerEntry player, final String jobName,
+            final IFuncParamEx<Integer, ICancelabeEditSession, MaxChangedBlocksException> action) {
         final int jobId = getJobId(player);
         final CancelabeEditSession session = new CancelabeEditSession(editSession, editSession.getMask(), jobId);
         final JobEntry job = new JobEntry(player, session, jobId, jobName);
@@ -997,5 +1008,10 @@ public class BlockPlacer implements IBlockPlacer {
                         return action.execute(session);
                     }
                 });
+    }
+
+    @Override
+    public void performAsAsyncJob(IThreadSafeEditSession editSession, IAsyncCommand asyncCommand) {
+        performAsAsyncJob(editSession, asyncCommand.getPlayer(), asyncCommand.getName(), asyncCommand);
     }
 }
